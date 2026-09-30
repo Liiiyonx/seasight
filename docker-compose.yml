@@ -1,0 +1,289 @@
+# 探海灵眸 SeaSight — 一键启动全套依赖服务
+# 用法：docker compose up -d
+# 参考 fastapi/full-stack-fastapi-template 与 Mediamtx 社区实践组织
+
+name: seasight
+
+services:
+  # ---------- 主数据库：PostgreSQL + PostGIS 空间扩展 ----------
+  postgres:
+    image: postgis/postgis:14-3.3
+    container_name: seasight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seasight}
+      POSTGRES_USER: ${POSTGRES_USER:-seasight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # 首次启动自动执行建表脚本（按文件名顺序）
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
+      # 运维 SQL（只读）：make ensure-partitions 用它补建 t_track 按日分区。
+      # 分区要随日期持续补，initdb.d 只在首次初始化跑一次，不能替代。
+      - ./deploy/postgres:/sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seasight} -d ${POSTGRES_DB:-seasight}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [seasight]
+
+  # ---------- 缓存与事件队列：Redis 7（Streams 做派单队列） ----------
+  redis:
+    image: redis:7-alpine
+    container_name: seasight-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [seasight]
+
+  # ---------- 消息总线：EMQX 5（设备接入 MQTT） ----------
+  emqx:
+    image: emqx/emqx:5.8
+    container_name: seasight-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_NODE_NAME: emqx@127.0.0.1
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${MQTT_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${MQTT_DASHBOARD_PASSWORD:-CHANGE_ME}
+      EMQX_ALLOW_ANONYMOUS: "false"
+      TZ: Asia/Shanghai
+    volumes:
+      # 启动时自动导入认证与 ACL 配置（见 deploy/emqx/bootstrap.csv）
+      - ./deploy/emqx/bootstrap.csv:/opt/emqx/data/bootstrap.csv:ro
+      - emqx_data:/opt/emqx/data
+    ports:
+      - "1883:1883"   # MQTT
+      - "8083:8083"   # MQTT over WebSocket
+      - "18083:18083" # Dashboard
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks: [seasight]
+
+  # ---------- 对象存储：MinIO（告警帧与作业影像） ----------
+  minio:
+    image: minio/minio:latest
+    container_name: seasight-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?请在 .env 中设置 MINIO_SECRET_KEY}
+      TZ: Asia/Shanghai
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # 控制台
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [seasight]
+
+  # 自动创建 bucket（一次性任务）
+  minio-init:
+    image: minio/mc:latest
+    container_name: seasight-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set seasight http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY};
+      mc mb --ignore-existing seasight/${MINIO_BUCKET_EVENTS:-events};
+      mc anonymous set download seasight/${MINIO_BUCKET_EVENTS:-events};
+      echo '[minio-init] bucket 就绪';
+      "
+    networks: [seasight]
+
+  # ---------- 流媒体：go2rtc（单文件，RTSP → WebRTC/FLV） ----------
+  # 选型说明：ZLMediaKit 功能更全但配置较重；原型期用 go2rtc 部署复杂度最低（社区推荐）
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: seasight-go2rtc
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./deploy/go2rtc/go2rtc.yaml:/config/go2rtc.yaml:ro
+    ports:
+      - "1984:1984"   # API + Web UI
+      - "8554:8554"   # RTSP 转发出口
+      - "8555:8555"   # WebRTC
+    networks: [seasight]
+
+  # ---------- 后端 API（开发模式挂载源码热重载） ----------
+  backend:
+    build:
+      # ★ 相对本文件（seahawk/docker-compose.yml）所在目录解析。
+      #   写成 ../backend 会指到 seahawk/ 之外 —— docker compose build
+      #   直接报 "path ... not found"。这条曾经写错过，改动前先数清层级。
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seasight-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      SECRET_KEY: ${SECRET_KEY:?请在 .env 中设置 SECRET_KEY}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-seasight}
+      POSTGRES_USER: ${POSTGRES_USER:-seasight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-backend_service}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-marine}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-events}
+      STREAM_BASE_URL: http://go2rtc:1984
+      AI_SERVICE_URL: http://ai-service:8081
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      # ---- Agent / 对话助手（容器内不读仓库根 .env，必须在此透传） ----
+      # 默认值与 app/core/config.py 完全一致，透传后行为不变；
+      # 演示层 docker-compose.demo.yml 覆盖 AGENT_REQUIRE_APPROVAL_FOR_WRITE=true。
+      AGENT_REQUIRE_APPROVAL_FOR_WRITE: ${AGENT_REQUIRE_APPROVAL_FOR_WRITE:-false}
+      AGENT_PERSISTENT_REPOSITORY_ENABLED: ${AGENT_PERSISTENT_REPOSITORY_ENABLED:-false}
+      AGENT_MODEL_ADAPTER_ENABLED: ${AGENT_MODEL_ADAPTER_ENABLED:-false}
+      AGENT_MODEL_BASE_URL: ${AGENT_MODEL_BASE_URL:-}
+      AGENT_MODEL_API_KEY: ${AGENT_MODEL_API_KEY:-}
+      AGENT_MODEL_NAME: ${AGENT_MODEL_NAME:-}
+      ASSISTANT_ENABLED: ${ASSISTANT_ENABLED:-true}
+      ASSISTANT_MODEL_BASE_URL: ${ASSISTANT_MODEL_BASE_URL:-}
+      ASSISTANT_MODEL_API_KEY: ${ASSISTANT_MODEL_API_KEY:-}
+      ASSISTANT_MODEL_NAME: ${ASSISTANT_MODEL_NAME:-}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./backend:/app
+      # 评测产物挂进容器根目录：后端用 `Path(__file__).parents[4] / "artifacts" / ...`
+      # 定位它，在容器里就是 /artifacts/agent_evals/latest_v2.json。
+      # 没有这条挂载，/api/v1/agents/evals/latest 会永远返回 6008（评测不可用），
+      # 前端的质量雷达也就一直是空态。只读挂载，容器内改不了。
+      - ./artifacts/agent_evals:/artifacts/agent_evals:ro
+      # edge 检测器（只读）：与 docker-compose.prod.yml 保持同一口径。
+      # 后端有 3 处 `from edge.detector.detector import CvDetector`，
+      # 而 backend 的构建上下文只有 ./backend，镜像里没有 edge/。
+      # 它们靠 `Path(__file__).parents[4]` 反推仓库根，容器内即 `/`，故挂到 /edge。
+      - ./edge:/edge:ro
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks: [seasight]
+
+  # ---------- AI 推理服务（独立进程，便于算法组单独发版） ----------
+  ai-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ai
+    container_name: seasight-ai
+    restart: unless-stopped
+    volumes:
+      - ./ml:/ml
+      - ./backend/app/services/ai:/app/ai
+    ports:
+      - "8081:8081"
+    environment:
+      AI_MODEL_PATH: /ml/models/best.onnx
+      AI_MODEL_VERSION: ${AI_MODEL_VERSION:-det_v0.1.0}
+      AI_CONF_THRESHOLD: "0.25"
+      AI_IOU_THRESHOLD: "0.45"
+      TZ: Asia/Shanghai
+    # 纯 CPU 模式即可满足演示；有 GPU 时取消下面注释
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks: [seasight]
+
+  # ---------- 前端（开发模式） ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # ★ 必须指定 dev 阶段：默认目标是 production（nginx + 静态产物），
+      #   而下面把 command 覆盖成了 npm run dev —— 若不指定 target，
+      #   nginx 镜像里根本没有 npm，容器会以 command not found 启动失败。
+      target: dev
+    container_name: seasight-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      TZ: Asia/Shanghai
+    volumes:
+      - ./frontend:/app
+      # ★ 匿名卷挡在宿主机挂载之上，让容器内的 node_modules 不被
+      #   宿主机的（可能是 Windows 版/架构不符的）目录覆盖。
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+    networks: [seasight]
+
+  # ---------- 前端（生产模式，可选） ----------
+  # 需要跑生产形态时：
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d frontend-prod
+  # 它把 vite build 产物交给 nginx 托管，并由 nginx 反代后端，
+  # 更适合真实部署（见 deploy/nginx/seasight.conf 的完整版配置）。
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: seasight-frontend-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:80"
+    networks: [seasight]
+    profiles: ["prod"]   # 默认不启动，显式 --profile prod 才起
+
+volumes:
+  postgres_data:
+  redis_data:
+  emqx_data:
+  minio_data:
+
+networks:
+  seasight:
+    driver: bridge

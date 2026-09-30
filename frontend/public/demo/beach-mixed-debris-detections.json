@@ -1,0 +1,30 @@
+{
+  "model": "yolov8s-worldv2.pt",
+  "prompt_classes": [
+    "plastic bottle"
+  ],
+  "confidence_threshold": 0.06,
+  "iou_threshold": 0.45,
+  "image_size": 1920,
+  "items": [
+    {
+      "path": "demo/beach-mixed-debris-4k.webp",
+      "name": "beach-mixed-debris-4k.webp",
+      "width": 3840,
+      "height": 2560,
+      "count": 1,
+      "detections": [
+        {
+          "class": "plastic bottle",
+          "confidence": 0.194349,
+          "bbox": [
+            388.988,
+            2146.163,
+            530.359,
+            2388.476
+          ]
+        }
+      ]
+    }
+  ]
+}

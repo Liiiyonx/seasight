@@ -1,0 +1,271 @@
+# SeaSight production stack.
+#
+# Use:
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+#
+# Only the frontend binds to the host by default. PostgreSQL, Redis, MinIO,
+# go2rtc, backend and AI service stay on the private Compose network. EMQX is
+# bound to loopback by default; set MQTT_BIND_ADDR to a trusted VPN/LAN address
+# when remote devices must publish telemetry.
+
+name: seasight-prod
+
+services:
+  postgres:
+    image: postgis/postgis:14-3.3
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seasight}
+      POSTGRES_USER: ${POSTGRES_USER:-seasight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      # Production intentionally mounts only the schema. The demo seed
+      # (02_seed.sql) must never run against a production database.
+      - ./backend/db/init/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      # 运维 SQL（只读）：make ensure-partitions 用它补建 t_track 按日分区。
+      # 刻意挂在 /sql 而不是 /docker-entrypoint-initdb.d ——
+      # initdb.d 只在数据卷为空时执行一次，当不了日常维护手段；
+      # t_track 的分区需要随日期持续补建（应用侧已在写入路径自愈，
+      # 这里是给运维的显式兜底与 pg_cron 入口）。
+      - ./deploy/postgres:/sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-seasight} -d ${POSTGRES_DB:-seasight}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "512mb",
+        "--maxmemory-policy",
+        "noeviction",
+        "--requirepass",
+        "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.production}",
+      ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.production}
+      TZ: Asia/Shanghai
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks: [private]
+
+  emqx:
+    image: emqx/emqx:5.8
+    restart: unless-stopped
+    environment:
+      EMQX_NODE_NAME: emqx@127.0.0.1
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${MQTT_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${MQTT_DASHBOARD_PASSWORD:?set MQTT_DASHBOARD_PASSWORD}
+      EMQX_ALLOW_ANONYMOUS: "false"
+      TZ: Asia/Shanghai
+    volumes:
+      # Generate this file with `make prod-mqtt-bootstrap` after filling
+      # .env.production. It is gitignored because it contains password hashes.
+      - ./deploy/emqx/bootstrap.production.csv:/opt/emqx/data/bootstrap.csv:ro
+      - emqx_prod_data:/opt/emqx/data
+    ports:
+      - "${MQTT_BIND_ADDR:-127.0.0.1}:1883:1883"
+      - "127.0.0.1:${MQTT_DASHBOARD_PORT:-18083}:18083"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18083/status"]
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 12
+    networks: [private]
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
+      TZ: Asia/Shanghai
+    volumes:
+      - minio_prod_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
+      MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-events}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mc alias set seasight http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "seasight/$$MINIO_BUCKET_EVENTS"
+        mc anonymous set none "seasight/$$MINIO_BUCKET_EVENTS"
+        echo "[minio-init] private bucket ready"
+    networks: [private]
+
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./deploy/go2rtc/go2rtc.yaml:/config/go2rtc.yaml:ro
+    networks: [private]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env.production}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-seasight}
+      POSTGRES_USER: ${POSTGRES_USER:-seasight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_CONNECT_TIMEOUT_SECONDS: ${POSTGRES_CONNECT_TIMEOUT_SECONDS:-3}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_BACKEND_USERNAME:-backend_service}
+      MQTT_PASSWORD: ${MQTT_BACKEND_PASSWORD:?set MQTT_BACKEND_PASSWORD}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-seasight-backend}
+      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-marine}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
+      MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-events}
+      MINIO_SECURE: "false"
+      STREAM_BASE_URL: http://go2rtc:1984
+      STREAM_PUBLIC_BASE_URL: ${STREAM_PUBLIC_BASE_URL:-}
+      AI_SERVICE_URL: http://ai-service:8081
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the public HTTPS origin}
+      TZ: Asia/Shanghai
+    volumes:
+      # 评测产物（只读）：让 /api/v1/agents/evals/latest 能读到 27 场景报告。
+      # 没有这条挂载，生产环境的评测页签永远返回 6008（构建上下文只有 backend/，
+      # 镜像里天然没有 artifacts/）。若服务器上没有该文件，端点仍安全返回 6008 空态。
+      - ./artifacts/agent_evals:/artifacts/agent_evals:ro
+      # edge 检测器（只读）：api/v1/ai.py、api/v1/assistant.py 与
+      # services/assistant/tools.py 都 `from edge.detector.detector import CvDetector`。
+      # backend 的构建上下文只有 ./backend，镜像里天然没有 edge/ ——
+      # 不挂这一条，图片分析与智能助手的图片检测都会失败。
+      # 挂到根目录 /edge 是刻意的：这些模块用 `Path(__file__).parents[4]` 反推仓库根，
+      # 在容器内 /app/app/api/v1/xx.py 往上四级正好是 `/`，与 artifacts 的定位口径一致。
+      - ./edge:/edge:ro
+    networks: [private]
+
+  ai-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ai
+    restart: unless-stopped
+    volumes:
+      - ./ml:/ml:ro
+      - ./backend/app/services/ai:/app/ai:ro
+    environment:
+      AI_MODEL_PATH: /ml/models/best.onnx
+      AI_MODEL_VERSION: ${AI_MODEL_VERSION:-det_v0.1.0}
+      AI_CONF_THRESHOLD: "0.25"
+      AI_IOU_THRESHOLD: "0.45"
+      TZ: Asia/Shanghai
+    networks: [private]
+
+  nexent-mcp:
+    build:
+      context: .
+      dockerfile: integrations/nexent/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      SEASIGHT_API_BASE_URL: http://backend:8000/api/v1
+      SEASIGHT_API_TOKEN: ${SEASIGHT_API_TOKEN:-}
+      SEASIGHT_API_USERNAME: ${SEASIGHT_API_USERNAME:-}
+      SEASIGHT_API_PASSWORD: ${SEASIGHT_API_PASSWORD:-}
+      SEASIGHT_API_REFRESH_SKEW_SECONDS: ${SEASIGHT_API_REFRESH_SKEW_SECONDS:-300}
+      SEASIGHT_MCP_ALLOW_WRITES: ${SEASIGHT_MCP_ALLOW_WRITES:-false}
+      SEASIGHT_MCP_TRANSPORT: streamable-http
+      SEASIGHT_MCP_HOST: 0.0.0.0
+      SEASIGHT_MCP_PORT: 8100
+      SEASIGHT_MCP_SERVER_TOKEN: ${SEASIGHT_MCP_SERVER_TOKEN:?set SEASIGHT_MCP_SERVER_TOKEN in .env.production}
+      SEASIGHT_MCP_PUBLIC_URL: ${SEASIGHT_MCP_PUBLIC_URL:-http://127.0.0.1:8100/mcp}
+      TZ: Asia/Shanghai
+    ports:
+      # Keep loopback by default. Set NEXENT_MCP_BIND_ADDR to a private
+      # Docker/LAN/VPN address only when Nexent cannot run on this host.
+      - "${NEXENT_MCP_BIND_ADDR:-127.0.0.1}:${NEXENT_MCP_PORT:-8100}:8100"
+    networks: [private]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        # Vite embeds this value into the static bundle at image build time.
+        VITE_TMAP_PROXY_URL: ${VITE_TMAP_PROXY_URL:-}
+        VITE_BASE_PATH: ${VITE_BASE_PATH:-/}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    networks: [private]
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  emqx_prod_data:
+  minio_prod_data:
+
+networks:
+  private:
+    driver: bridge

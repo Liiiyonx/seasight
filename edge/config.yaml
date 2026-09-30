@@ -1,0 +1,207 @@
+# ============================================================
+# 探海灵眸 SeaSight — 真实边缘盒配置（OpenCV 检测版）
+# ============================================================
+# 与 edge/simulator/config.yaml 的区别：
+#   · 那个是**模拟器**用的（自己造假检测框）
+#   · 这个是**真实边缘程序** edge/main.py 用的（OpenCV 真检测）
+# 两者共用同一套 MQTT 主题、时序校验与上报节流参数，
+# 因此平台侧完全无法区分报文来自模拟器还是真实摄像头。
+
+site_id: "lianjiang"
+
+mqtt:
+  host: "localhost"
+  port: 1883
+  username: "seasight"
+  password: "seasight"
+  keepalive: 60
+  reconnect_interval: 5
+  use_lwt: true
+
+# ------------------------------------------------------------
+# OpenCV 检测器（edge/detector/detector.py）
+#
+# 这套参数的设计前提：**检测器可以不准，但必须可解释**。
+# 误报由下游时序校验（temporal 段）压制，架构上已经为此付过费，
+# 见 docs/software-design.md §2.3：原始检测 5772 条 → 确认事件 52 条。
+# ------------------------------------------------------------
+detector:
+  # ---- 检测通道选择（★ 默认 cv：现网与主告警链路行为完全不变）----
+  #   cv    = OpenCV 传统视觉（本文件下面那套参数），零数据依赖，主通道
+  #   world = 开放词汇检测（YOLO-World，零样本），演示/对照用，见下面的 world 段
+  # 改这一行之前请先读 docs/decisions.md 里关于"换通道不换契约"的说明：
+  # 两个通道的输出契约完全一致，但**置信度尺度不同**，时序门限不能共用。
+  backend: "cv"
+
+  # ---- 背景建模（抓"新出现的/动着的"东西）----
+  background:
+    history: 300            # 建模用的历史帧数：越大越稳，但适应光照变慢
+    dist2_threshold: 300.0  # 判定为前景的距离阈值：调小 → 更敏感也更多噪点
+    detect_shadows: true    # 阴影标为 127，下面阈值化时会剔掉
+
+  # ---- 颜色通道（抓"白亮的泡沫"，即使它停着不动）----
+  # 为什么要单独一路：泡沫可能随浪停在镜头前不动，
+  # 纯背景减除会在几十帧后把它学成背景，永远不再报警。
+  color:
+    enabled: true
+    v_min: 150              # HSV 明度下限
+    s_max: 70               # HSV 饱和度上限（白色几乎不带颜色）
+    # 暗色通道：废旧渔网/湿缆绳比海面暗得多，而 KNN 背景建模会把
+    # "比背景暗"的东西标成**阴影(127)**，阈值化时被剔掉 ——
+    # 实测暗色细长渔具的候选区因此整帧为空，所以必须单独一路抓暗目标。
+    dark_enabled: true
+    dark_v_max: 70          # 低于此明度视为"暗目标"（海面本身约 110）
+
+  # ---- 形态学与候选过滤 ----
+  morph_open: 3             # 开运算核：吃掉孤立噪点/波光
+  morph_close: 7            # 闭运算核：填上泡沫内部的空洞
+  min_area: 40              # 最小面积（px²）—— 小于此基本是水花
+  max_area: 40000           # 最大面积（px²）—— 大于此是船/大块漂浮物，不是目标
+  min_solidity: 0.35        # 面积/凸包面积：过低说明形状破碎，是浪花
+  max_aspect: 8.0           # 长宽比上限：过细长是水痕或缆绳阴影
+
+  # ---- 四类别判定规则（顺序即优先级，先命中先得）----
+  # 设计依据：连江养殖区实际海漂垃圾构成
+  #   foam         EPS 泡沫浮球碎片 —— 白、亮、团状，最易分，也是治理优先级最高的
+  #   fishing_gear 废旧渔网绳索     —— 暗、细长、破碎
+  #   plastic      塑胶浮球/瓶/袋   —— 有彩度（蓝/红/黄）
+  #   other        兜底（木板、藻团、生活杂物）
+  classifier:
+    fishing_gear:
+      aspect_min: 2.5       # 长宽比（长边/短边）
+      solidity_max: 0.80    # 网状/绳状物体凸包填充度低
+      v_max: 170            # 废旧渔具偏暗（湿、脏、半沉）
+    foam:
+      s_max: 70             # 几乎不带颜色
+      v_min: 150            # 白亮
+      circularity_min: 0.20 # 团状（圆度 = 4πA/P²，圆=1，线≈0）
+    plastic:
+      s_min: 70             # 有彩度是塑料与泡沫最主要的 separable 特征
+
+  # ---- 置信度（伪置信度：不是概率，是"多像该类"的可解释打分）----
+  # 为什么要有：下游 TemporalValidator 用 min_confidence=0.45 做第一道过滤。
+  # 打分必须能把"明显的水花/反光"压到 0.45 以下，否则门限形同虚设。
+  confidence:
+    base: 0.55              # 命中某类规则的基础分
+    span: 0.40              # 匹配度带来的浮动
+    min: 0.30               # 下限（低于此必然被时序校验丢弃）
+    max: 0.95
+    # 反光惩罚：正午海面高光是白色、小面积、形状破碎的圆点，
+    # 与泡沫在这三个特征上高度重合，是最大的误报源。
+    glare:
+      v_threshold: 245      # 极亮
+      area_max: 400         # 且很小
+      circularity_max: 0.55 # 且形状不规整
+      penalty: 0.25
+    # 面积适中度：太大（船/浮筒）或太小（水花）都降分
+    size:
+      small_factor: 0.4     # area < min_area * small_times
+      small_times: 2
+      large_factor: 0.5     # area > max_area * large_ratio
+      large_ratio: 0.5
+
+  # ----------------------------------------------------------
+  # 开放词汇通道（YOLO-World，零样本）—— 仅在 backend: world 时启用
+  #
+  # ★ 为什么单独一套参数、而不是复用上面那套：
+  #   两个通道的**置信度尺度不同**。上面那套的 confidence 是"伪置信度"
+  #   （基础分 + 匹配度浮动，范围 0.30~0.95）；而开放词汇模型的输出分数
+  #   要低一个量级 —— 本仓库历史实测：5 张演示原图最高 0.413，
+  #   4 份 prompt 标定记录里最高 0.184（详见 world_detector.py 模块头部标定表）。
+  #   把 cv 通道的 0.45 门限套过来，本通道会**一条检测都过不去**，
+  #   而现象只是"world 通道没结果"，排查方向会被完全带偏。
+  #
+  # ★ 姿态：本通道用于演示与对照，不承诺精度，不进主告警链路。
+  # ----------------------------------------------------------
+  world:
+    weights: "yolov8s-worldv2.pt"
+    # ★ 这是**相对路径，按仓库根解析**（不是按当前工作目录）。
+    #   为什么强调：ultralytics 默认按 cwd 找权重，找不到就**静默联网下载**。
+    #   从 edge/ 启动（`edge/main.py` 的常规用法）时裸文件名会找不到 →
+    #   联网重试 3 次、启动卡住 2 分钟以上、且不抛任何异常。
+    #   代码已在 world_detector.resolve_weights_path 里统一按仓库根解析。
+    clip_dir: "~/.cache/clip-vit-base-patch32"
+    # CPU 是刻意默认：本机 torch 构建与 5060（sm_120）不匹配，见 README 环境说明
+    device: "cpu"
+    imgsz: 960              # 原演示脚本用 1600；CPU 上太慢，演示降到 960
+    # 模型侧打分门限（零样本尺度，**不是** 0.45 —— 那是 cv 的时序门限）。
+    # 为什么是 0.02：本通道的用途是"现场加词即检出该类"，默认门限必须让
+    # **四个契约类别都可报**。实测逐类最高分（见
+    # artifacts/metrics/vision_backends_latest.json 的 threshold_probe）：
+    #   other 0.5824 / fishing_gear 0.0514 / plastic 0.0355 / foam 0.0260
+    # → foam 最紧，门限须低于 0.026，故取 0.02。
+    # ★ 这是为满足"四类皆可报"选定的**演示工作点**，不是精度最优门限：
+    #   独立测试集真值标注为 0，无数据可标定。现场换门限用 --world-conf。
+    conf: 0.02
+    iou: 0.45
+    max_det: 60
+    # 喂给时序校验的门限，与 conf 同尺度。
+    # 若沿用 temporal 段的 0.45，本通道的检测会在时序环节被全部丢掉。
+    temporal_min_confidence: 0.02
+    # 默认提示词集：与 scripts/detect_marine_demo.py 的 DEFAULT_CLASSES 一致
+    # （test_world_detector.py 里有 AST 对账测试守住同步）
+    # 现场加词不需要改这个文件，用 --world-prompt 追加即可。
+    prompt_classes:
+      - "plastic bottle"
+      - "plastic waste"
+      - "garbage"
+      - "fishing net"
+      - "foam debris"
+      - "marine debris"
+      - "discarded shoe"
+    # 是否允许本地找不到权重时自动联网下载。
+    # 默认 false：现场网络不可预期，静默下载会让启动时间不可控
+    # （实测联网重试 3 次卡住 2 分多钟，且不抛异常 —— 现象只是"程序没反应"）。
+    # 首次部署确需下载时改 true，或手工把权重放到上面 weights 解析出的位置。
+    allow_weights_download: false
+
+# ------------------------------------------------------------
+# 时序校验（与模拟器、docs/software-design.md §2.3 三处必须一致）
+# ------------------------------------------------------------
+temporal:
+  enabled: true
+  window_frames: 15
+  min_hits: 3
+  grid_size: 64
+  min_confidence: 0.45
+  decimation: 4
+  match_distance: 60.0
+  min_iou: 0.25
+  max_misses: 5
+
+# 上报节流
+reporting:
+  cooldown_seconds: 90
+  min_interval_seconds: 2
+  max_detections: 20
+
+# 断网补传缓存
+buffer:
+  enabled: true
+  max_size: 1000
+  flush_batch: 20
+  flush_interval: 1.0
+
+# 取流源（真实边缘盒上是 RTSP；调试可用视频文件或本地摄像头）
+source:
+  # 三选一：rtsp / file / camera
+  type: "file"
+  rtsp: "rtsp://admin:password@192.168.1.64:554/stream1"
+  file: "samples/shore.mp4"
+  camera: 0
+  # 取流失败后的重连间隔（秒）
+  reconnect_interval: 5
+  # 每读多少帧打一次日志
+  log_every: 100
+
+# 设备身份（与平台种子数据 db/init/02_seed.sql 对齐，否则平台拒收）
+device:
+  device_id: "CAM-MABI-01"
+  name: "马鼻码头摄像头"
+  device_type: "shore_camera"
+  lng: 119.6521
+  lat: 26.3864
+
+# 只处理画面的一部分（排除天空、岸边建筑、固定缆绳等恒定误报源）
+# 为空表示全画面；填多边形顶点（相对宽高，0~1）则只在多边形内检测
+roi: []

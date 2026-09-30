@@ -1,0 +1,30 @@
+{
+  "model": "yolov8s-worldv2.pt",
+  "prompt_classes": [
+    "fishing gear"
+  ],
+  "confidence_threshold": 0.02,
+  "iou_threshold": 0.45,
+  "image_size": 1920,
+  "items": [
+    {
+      "path": "demo/fishing-net-4k.webp",
+      "name": "fishing-net-4k.webp",
+      "width": 3840,
+      "height": 2880,
+      "count": 1,
+      "detections": [
+        {
+          "class": "fishing gear",
+          "confidence": 0.065392,
+          "bbox": [
+            1756.963,
+            1555.425,
+            2026.448,
+            2000.468
+          ]
+        }
+      ]
+    }
+  ]
+}

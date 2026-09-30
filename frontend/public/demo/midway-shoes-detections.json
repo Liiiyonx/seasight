@@ -1,0 +1,80 @@
+{
+  "model": "yolov8s-worldv2.pt",
+  "prompt_classes": [
+    "shoe"
+  ],
+  "confidence_threshold": 0.035,
+  "iou_threshold": 0.45,
+  "image_size": 1920,
+  "items": [
+    {
+      "path": "demo/midway-shoes-4k.webp",
+      "name": "midway-shoes-4k.webp",
+      "width": 3840,
+      "height": 2560,
+      "count": 6,
+      "detections": [
+        {
+          "class": "shoe",
+          "confidence": 0.212161,
+          "bbox": [
+            2473.19,
+            1477.729,
+            3680.914,
+            2557.747
+          ]
+        },
+        {
+          "class": "shoe",
+          "confidence": 0.127988,
+          "bbox": [
+            3246.706,
+            2002.808,
+            3699.886,
+            2390.559
+          ]
+        },
+        {
+          "class": "shoe",
+          "confidence": 0.097781,
+          "bbox": [
+            1979.812,
+            115.697,
+            3334.394,
+            1421.439
+          ]
+        },
+        {
+          "class": "shoe",
+          "confidence": 0.073317,
+          "bbox": [
+            2653.542,
+            1996.901,
+            3687.336,
+            2559.131
+          ]
+        },
+        {
+          "class": "shoe",
+          "confidence": 0.073223,
+          "bbox": [
+            357.496,
+            579.139,
+            1460.677,
+            1812.762
+          ]
+        },
+        {
+          "class": "shoe",
+          "confidence": 0.044612,
+          "bbox": [
+            1528.683,
+            1145.447,
+            3142.605,
+            2444.755
+          ]
+        }
+      ]
+    }
+  ]
+}

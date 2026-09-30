@@ -1,0 +1,154 @@
+# ============================================================
+# 探海灵眸 SeaSight — 边缘盒配置文件
+# ============================================================
+# 对应真实边缘盒上 /opt/seasight/config.yaml 的位置。
+# 摄像头点位与平台种子数据（db/init/02_seed.sql）保持一致，
+# 否则平台会因「设备未注册」而拒收事件。
+
+# 站点标识（用于构造 MQTT 主题 marine/{site_id}/{device_id}/...）
+site_id: "lianjiang"
+
+# MQTT Broker（与平台 .env 中 MQTT_* 对应）
+mqtt:
+  host: "localhost"
+  port: 1883
+  username: "seasight"
+  password: "seasight"
+  keepalive: 60
+  # 断线重连间隔（秒）
+  reconnect_interval: 5
+  # 遗嘱消息（异常断开时 Broker 代发，平台据此判定离线）
+  use_lwt: true
+
+# 检测推理
+inference:
+  model_version: "det_v0.1.0"
+  # 真实边缘盒上跑 ONNX/TensorRT；模拟器只产出符合契约的结果
+  confidence_threshold: 0.45
+  # 单帧最多上报目标数
+  max_detections: 20
+
+# 时序校验 —— 降误报的第一道闸
+# 浪花瞬时出现又消失，垃圾会持续存在。
+# 只有滑动窗口内连续 N 帧在同一网格命中，才升级为确认事件。
+temporal:
+  enabled: true
+  window_frames: 15        # 滑动窗口长度（帧）
+  min_hits: 3              # 窗口内最少命中次数
+  grid_size: 64            # 空间聚合格网边长（像素），避免同一垃圾被当成多个目标
+  min_confidence: 0.45     # 进入窗口的最低置信度
+  decimation: 4            # 抽帧推理：每 N 帧推一次模型（真实边缘盒算力所限）
+
+  # ---- 关联三重门限（对应 docs/software-design.md §2.3 参数表）----
+  # 新检测框只有**同时**满足「类别相同 + 中心位移达标 + IoU 达标」
+  # 才会被认作某个已有目标的延续。
+  #
+  # ★ 这两个值必须写在配置里，不能只靠代码默认值兜着。
+  #   早期版本实例化时漏传，导致在这里改了也不生效 —— 且不报错。
+  match_distance: 60.0     # 中心位移上限（px）：1080p 下约画面宽度 3%
+  min_iou: 0.25            # 最小框重叠度：允许抖动，拒绝"碰巧靠近"
+  max_misses: 5            # 连续丢失多少帧后淘汰（0.6 秒，容忍短暂遮挡）
+                           # 偏小 → 被浪遮挡就丢，同一片垃圾重复上报
+                           # 偏大 → 噪声目标赖着不走，白占跟踪槽位
+
+# 上报节流：即使连续命中，同一网格在冷却期内不重复上报
+reporting:
+  cooldown_seconds: 90     # 同一网格上报冷却
+  min_interval_seconds: 2  # 任意两次上报的最小间隔
+
+# 断网补传缓存
+buffer:
+  enabled: true
+  max_size: 1000           # 本地队列上限，满了丢最旧
+  flush_batch: 20          # 恢复后每批补传条数
+  flush_interval: 1.0      # 批间隔（秒）
+
+# 设备点位（与平台种子数据对齐）
+devices:
+  - device_id: "CAM-MABI-01"
+    name: "马鼻码头摄像头"
+    device_type: "shore_camera"
+    lng: 119.6521
+    lat: 26.3864
+    # 该点位的主打垃圾类别与出现频率（贴合连江养殖区实际）
+    profile:
+      foam: 0.42          # EPS 泡沫浮球碎片 —— 当地最突出
+      plastic: 0.24
+      fishing_gear: 0.22
+      other: 0.12
+    # 事件产生速率倍率（码头人流大，垃圾多）
+    rate: 1.6
+
+  - device_id: "CAM-HUANGQI-01"
+    name: "黄岐渔港摄像头"
+    device_type: "shore_camera"
+    lng: 119.9042
+    lat: 26.3158
+    profile:
+      foam: 0.36
+      plastic: 0.22
+      fishing_gear: 0.30   # 渔港废旧渔具更多
+      other: 0.12
+    rate: 1.4
+
+  - device_id: "CAM-XIAOCHENG-01"
+    name: "筱埕养殖区摄像头"
+    device_type: "shore_camera"
+    lng: 119.8362
+    lat: 26.3517
+    profile:
+      foam: 0.50           # 养殖区泡沫浮球最密集
+      plastic: 0.20
+      fishing_gear: 0.20
+      other: 0.10
+    rate: 1.8
+
+  - device_id: "CAM-TAILU-01"
+    name: "苔菉航道摄像头"
+    device_type: "shore_camera"
+    lng: 120.0098
+    lat: 26.2931
+    profile:
+      foam: 0.25
+      plastic: 0.35
+      fishing_gear: 0.20
+      other: 0.20
+    rate: 0.8
+
+  - device_id: "CAM-ANKAI-01"
+    name: "安凯渔排区摄像头"
+    device_type: "shore_camera"
+    lng: 119.7605
+    lat: 26.4198
+    profile:
+      foam: 0.45
+      plastic: 0.18
+      fishing_gear: 0.25
+      other: 0.12
+    rate: 1.0
+
+  - device_id: "CAM-XIAGONG-01"
+    name: "下宫回收点摄像头"
+    device_type: "shore_camera"
+    lng: 119.8871
+    lat: 26.3742
+    profile:
+      foam: 0.30
+      plastic: 0.40
+      fishing_gear: 0.15
+      other: 0.15
+    rate: 0.7
+
+  - device_id: "UAV-001"
+    name: "巡查无人机 01"
+    device_type: "drone"
+    lng: 119.8700
+    lat: 26.3600
+    # 无人机巡飞范围（在此半径内随机落点）
+    patrol_radius_deg: 0.03
+    profile:
+      foam: 0.38
+      plastic: 0.24
+      fishing_gear: 0.24
+      other: 0.14
+    rate: 0.6

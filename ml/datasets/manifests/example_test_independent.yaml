@@ -1,0 +1,44 @@
+# ============================================================
+# 示例：独立测试集清单（manifest_type: test）
+# ★ 只用于最终评测：评审前不得触碰，禁止参与训练/调参/阈值选择。
+# 当前仅演示结构 —— 未采集任何图片，status: planned，E0。
+# ============================================================
+schema_version: "1.0"
+manifest_type: test
+name: test_20260918_lianjiang_example
+description: "独立测试集示例：按日期+点位隔离，只用于最终评测（结构演示，无真实图片）"
+
+status: planned
+
+isolation:
+  method: physical
+  physical_note: "独立目录树 ml/datasets/seasight_test/，与 train/val 根目录不同；仅评测脚本可读"
+  logical_rule: "按日期+点位隔离：采集日期晚于 train/val 批次收尾日；点位与 train/val 不重叠；任何文件不得同时出现在 train|val 与本清单"
+
+data_type: synthetic
+evidence_level: E0
+
+location:
+  images: ../seasight_test/images/test
+  labels: ../seasight_test/labels/test
+  video: null
+
+annotation:
+  format: yolo_txt
+  iou_threshold: 0.5
+
+created: "2026-09-18"
+owner: "感知负责人"
+source:
+  device: "CAM-MABI-01"
+  region: "连江马鼻码头（独立采集批次）"
+  date_range: ["2026-10-01", "2026-10-05"]
+  license: "合成帧，无授权约束（自研）"
+
+sample_count: 0
+
+confounders:
+  - lighting
+  - background
+  - target_size
+  - weather

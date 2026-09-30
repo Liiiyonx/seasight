@@ -1,0 +1,30 @@
+{
+  "model": "yolov8s-worldv2.pt",
+  "prompt_classes": [
+    "polystyrene cup"
+  ],
+  "confidence_threshold": 0.06,
+  "iou_threshold": 0.45,
+  "image_size": 1920,
+  "items": [
+    {
+      "path": "demo/styrofoam-cup-4k.webp",
+      "name": "styrofoam-cup-4k.webp",
+      "width": 3840,
+      "height": 2876,
+      "count": 1,
+      "detections": [
+        {
+          "class": "polystyrene cup",
+          "confidence": 0.095801,
+          "bbox": [
+            1428.767,
+            1295.968,
+            2554.326,
+            2563.375
+          ]
+        }
+      ]
+    }
+  ]
+}

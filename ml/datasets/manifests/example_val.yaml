@@ -1,0 +1,43 @@
+# ============================================================
+# 示例：验证集清单（manifest_type: val）
+# 当前仅演示结构 —— 未采集任何图片，status: planned，E0。
+# ============================================================
+schema_version: "1.0"
+manifest_type: val
+name: val_20260918_lianjiang_example
+description: "验证集示例：与 train 同一批次、不同时间窗（结构演示，无真实图片）"
+
+status: planned
+
+isolation:
+  method: logical
+  physical_note: "与 train 同根目录树，但目录不同：ml/datasets/seasight/images/val"
+  logical_rule: "同批数据按天切分：train 取第 1~20 天，val 取第 21~25 天；两者不共享任何文件"
+
+data_type: synthetic
+evidence_level: E0
+
+location:
+  images: ../seasight/images/val
+  labels: ../seasight/labels/val
+  video: null
+
+annotation:
+  format: yolo_txt
+  iou_threshold: 0.5
+
+created: "2026-09-18"
+owner: "感知负责人"
+source:
+  device: "CAM-MABI-01"
+  region: "连江马鼻码头"
+  date_range: ["2026-09-21", "2026-09-25"]
+  license: "合成帧，无授权约束（自研）"
+
+sample_count: 0
+
+confounders:
+  - lighting
+  - background
+  - target_size
+  - weather

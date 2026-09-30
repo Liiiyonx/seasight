@@ -1,0 +1,56 @@
+# 探海灵眸 SeaSight — 后端依赖
+# Python 3.11+
+
+# ---- Web 框架 ----
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.17
+
+# ---- 数据校验与配置 ----
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ---- 数据库 ----
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0              # 应用运行时（异步）
+psycopg2-binary==2.9.10      # Alembic 迁移用（同步，见 alembic/env.py 的说明）
+geoalchemy2==0.16.0          # PostGIS 空间类型支持
+alembic==1.14.0              # 数据库迁移
+
+# ---- 缓存与队列 ----
+redis==5.2.0                 # 含 Streams 消费者组
+
+# ---- MQTT ----
+aiomqtt==2.3.0               # 异步 MQTT 客户端
+
+# ---- 对象存储 ----
+minio==7.2.10
+
+# ---- 图像（OpenCV 传统视觉检测器）----
+# ★ 这三个包是必需的，不是可选优化：
+#   api/v1/ai.py 的 /ai/analyze-image、api/v1/assistant.py 的图片校验、
+#   services/assistant/tools.py 的 image.analyze 工具，都要 import cv2 + numpy
+#   并使用 edge/detector 的 CvDetector。
+#   早期这里漏列，导致线上图片分析直接 500「服务器内部错误」、
+#   智能助手回「图片检测组件不可用（缺少 cv2/numpy 依赖）」。
+#   版本与 requirements-ai.txt 对齐，避免两个镜像对同一张图给出不同解码结果。
+#   headless 版不含 GUI 依赖，适合服务端；无需 libGL。
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+
+# ---- 认证与安全 ----
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1                 # passlib 1.7.4 is incompatible with bcrypt 5.x
+python-jose[cryptography]==3.3.0
+
+# ---- 工具 ----
+httpx==0.28.1                # 调用 AI 推理服务
+python-dateutil==2.9.0.post0
+orjson==3.10.12              # 高性能 JSON
+loguru==0.7.3                # 结构化日志
+
+# ---- 测试 ----
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+aiosqlite==0.20.0

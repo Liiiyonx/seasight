@@ -1,0 +1,71 @@
+# go2rtc 配置 —— 探海灵眸 视频流服务
+#
+# 职责：把摄像头的 RTSP 流转换成浏览器能直接播的格式。
+#   RTSP  →  WebRTC（超低延迟，优先）
+#         →  HTTP-FLV（兼容性兜底，mpegts.js 播放）
+#
+# ★ 关键设计：视频流**不经过边缘盒**
+#   边缘盒是旁路取流（自己再拉一路 RTSP 做推理），不做转发。
+#   否则转发和推理抢同一份算力，推理帧率会掉到不可用的程度。
+#   所以这里的 streams 直接指向摄像头，不指向边缘盒。
+#
+# 文档：https://github.com/AlexxIT/go2rtc
+
+log:
+  level: info          # debug 会打每帧信息，演示时别开
+
+api:
+  listen: ":1984"      # Web UI + REST API（后端用它拼播放地址）
+  origin: "*"
+
+rtsp:
+  listen: ":8554"      # 对外转发的 RTSP 出口（给 NVR 或二次分发用）
+
+webrtc:
+  listen: ":8555"
+  # 局域网/本机演示用。生产环境部署在公网时必须显式指定候选地址，
+  # 否则浏览器拿不到可直连的 ICE candidate，画面一直转圈。
+  candidates:
+    - 127.0.0.1:8555
+    # - <公网IP>:8555
+    # - stun:8555
+
+# ----------------------------------------------------------------------
+# 流定义
+#
+# 命名规范与 t_device.device_id 保持一致，后端直接按设备号拼 src 参数：
+#     /api/stream.html?src=CAM-MABI-01
+#
+# 演示环境没有真实摄像头，先用公开测试流占位。
+# 拿到真实 RTSP 后把 url 换掉即可，key 不要改（后端按 key 取流）。
+# ----------------------------------------------------------------------
+streams:
+  # ---------- 连江沿海点位（演示占位流） ----------
+  CAM-MABI-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  CAM-HUANGQI-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  CAM-XIAOCHENG-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  CAM-TAILU-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  CAM-ANKAI-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  CAM-XIAGONG-01: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+
+  # ---------- 机器人机载摄像头 ----------
+  # 机器人走 4G，建议先用 WebRTC；带宽不足时降级为低分辨率子码流
+  ROV-001: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+  ROV-002: ffmpeg:rtsp://127.0.0.1:8554/placeholder#video=h264
+
+# ----------------------------------------------------------------------
+# 真实摄像头接入示例（拿到设备后照抄，改 IP/账号即可）
+#
+# 海康威视（子码流更省带宽，演示优先用 102）：
+#   CAM-MABI-01: rtsp://admin:<密码>@192.168.1.64:554/Streaming/Channels/102
+#
+# 大华：
+#   CAM-MABI-01: rtsp://admin:<密码>@192.168.1.65:554/cam/realmonitor?channel=1&subtype=1
+#
+# ★ 不要在真实配置里保留任何明文密码 —— 用 ${ENV_VAR} 或统一的凭据文件，
+#   并且这个文件要进 .gitignore（见仓库根 .gitignore）。
+#
+# 多路复用示例（一路拉流，多个消费端共用，省摄像头连接数）：
+#   all_cams: ffmpeg:rtsp://.../Streaming/Channels/101#video=h264
+#   # 然后把 CAM-xxx 指到 all_cams 上做 alias
+# ----------------------------------------------------------------------

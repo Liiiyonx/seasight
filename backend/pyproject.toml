@@ -1,0 +1,58 @@
+# 探海灵眸 SeaSight — 后端工程配置
+#
+# ★★ 为什么 Alembic 的配置放在这里，而不是 alembic.ini？★★
+#
+# 因为 alembic.ini 在中文 Windows 上**必定崩**，这不是配置写法问题：
+#
+#   Alembic 读 ini 的代码（alembic/util/compat.py:130）：
+#       return file_config.read(file_argument, encoding="locale")
+#
+#   而 Python 的 open(encoding="locale") 会直接取 locale.getencoding()，
+#   **绕过 UTF-8 模式**，实测：
+#
+#       locale.getencoding()               -> cp936   ← 中文 Windows 的真实 locale
+#       open(encoding="locale").encoding   -> cp936
+#       open(encoding=None).encoding       -> utf-8   ← 因为设了 PYTHONUTF8=1
+#
+#   于是 alembic.ini 里只要有一个非 ASCII 字节（哪怕只是中文注释），
+#   `alembic` 的所有子命令都会死在 UnicodeDecodeError: 'gbk' codec ...
+#
+#   已实测无效的三种绕法（别浪费时间重试）：
+#     ① 在 ini 首行加 `# -*- coding: utf-8 -*-`
+#        → configparser 只在 encoding=None 时才探测该声明，显式传值会忽略它
+#     ② 设 PYTHONUTF8=1 / PYTHONCOERCECLOCALE=0
+#        → 只管得住 encoding=None，管不住 encoding="locale"
+#     ③ 把 ini 注释全改英文
+#        → 治标不治本，团队里任何人加一行中文就复发
+#
+# TOML 没有这个问题：Alembic 读 pyproject.toml 用的是
+#   open(self._toml_file_path, "rb") + tomllib.load(f)
+# 二进制模式 + tomllib 强制 UTF-8，**编码参数根本不参与**，根治。
+#
+# 保留 alembic.ini 仅为了那份 logging 配置（TOML 不支持 logging 段，
+# Alembic 官方说这种情况用 ``alembic init --template pyproject`` 会生成
+# 一个只含 [loggers] 的 ini）。见文件末尾说明。
+
+# ----------------------------------------------------------------------
+# [tool.alembic] —— 已废弃（2026-09-19 总控集成修正）
+# ----------------------------------------------------------------------
+# Alembic 主配置已迁移到 backend/alembic.ini（唯一 ASCII-only 的 [alembic] 段）。
+# 原因（已独立复现）：Alembic 1.14 不自动发现 pyproject.toml；
+# `alembic -c pyproject.toml` 仍通过 configparser 以 locale(GBK) 读取本文件，
+# 中文注释必然触发 UnicodeDecodeError。历史配置（script_location/file_template/
+# timezone/truncate_slug_length/version_locations/version_path_separator 等）
+# 的等价值已全部写入 alembic.ini。所有 alembic 命令必须显式
+# `python -m alembic -c alembic.ini`（见 Makefile migrate* 目标）。
+
+# 双轨制要点（不变）：
+#   轨道 A：初始建表走 db/init/01_schema.sql（PostGIS/分区表/触发器，autogenerate 表达不了）
+#   轨道 B：后续增量变更走 Alembic（alembic.ini 配置）
+#   新环境先 stamp head 打桩，否则 autogenerate 会试图重建已存在的表。
+
+[tool.pytest.ini_options]
+# 让 `pytest` 在 backend/ 下直接可跑，且能 import app.*
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+# 固定异步 fixture 的事件循环作用域，避免 pytest-asyncio 未来默认值变化导致测试语义漂移。
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,87 @@
+# ============================================================
+# 数据集清单模板（template_manifest.yaml）
+# 探海灵眸 SeaSight — WP-06 数据集隔离机制
+#
+# 新增清单必须逐字段对齐本模板，字段说明见注释。
+# schema_version 升级时，评测脚本与 ml/tests 必须同步跟进。
+# ============================================================
+
+schema_version: "1.0"
+
+# 分集类型（冻结四类）：train | val | test | blind
+manifest_type: test
+
+# 清单名：可追溯（建议 <类型>_<采集批次>，如 test_20261001_lianjiang）
+name: test_YYYYMMDD_location
+
+# 一句话说明这批数据是什么
+description: ""
+
+# 就绪状态：planned（未采集/未就绪）| ready（可评测）| sealed（封存，只读）
+status: planned
+
+# 隔离说明 —— 评测脚本据此判断是否存在泄漏风险
+isolation:
+  # physical（物理隔离，不同目录树/只读介质）| logical（逻辑隔离，清单圈定）
+  method: physical
+  # 物理或逻辑隔离的具体写法（必填，禁止留空）
+  physical_note: ""
+  # logical 隔离时写明切分规则（日期窗/点位/设备），physical 可留空
+  logical_rule: ""
+
+# 数据性质：planned | synthetic | quasi_real | real
+data_type: planned
+
+# 证据等级（与计划书 §1 一致，评测脚本会校验上限）：
+#   planned→E0；synthetic→E1|E2（最高 E2）；quasi_real→E2；real→E3（E4 需合同凭证）
+evidence_level: E0
+
+# WP-13 数据协议关联（可选）：指向 SeaSight COCO-like JSON（ground-truth/标注真值）。
+# 填写后评测脚本优先以该 JSON 的标注为真值（经 convert_annotations 校验），
+# 并以 JSON 内 evidence_level 约束输出证据等级；留空则走 YOLO labels。
+# protocol_ref: datasets/seasight/test_YYYYMMDD/dataset.json
+
+# 数据位置（相对本文件解析；绝对路径亦可）
+location:
+  # 图片目录（与 labels 配对，YOLO 格式）与 video 二选一或都给
+  images: ""
+  # YOLO 标签目录（images/ → labels/ 惯例；无标签=纯背景负样本）
+  labels: ""
+  # 视频/有序帧流（用于时序链路评测：计算抑制率）；可空
+  video: null
+
+# 标注信息
+annotation:
+  format: yolo_txt        # 当前仅支持 YOLO txt：class cx cy w h（归一化）
+  iou_threshold: 0.5      # 评测匹配 IoU 门限（可在 seasight.yaml evaluation 段覆盖）
+
+# WP-13 数据协议关联（可选）：指向 SeaSight COCO-like JSON（docs/perception-data-protocol.md）。
+# 提供时评测脚本（--gt-json）以协议 JSON 为 ground-truth 来源（经协议校验：
+# 跳过坏样本、拒绝越级证据、检测泄漏）；与 labels 二选一或都给（协议优先）。
+protocol_ref: null         # 示例: ../seasight_test/dataset.json
+
+# 元信息
+created: "YYYY-MM-DD"
+owner: "感知负责人"
+source:
+  device: ""              # 设备/点位
+  region: ""              # 区域
+  date_range: ["YYYY-MM-DD", "YYYY-MM-DD"]
+  license: ""             # 授权/来源说明（计划书 12.2 要求数据授权记录）
+
+# 当前样本数（评测脚本以实际解析为准，这里只做人工申报）
+sample_count: 0
+
+# 混淆因素分层（评测脚本按这些键分层统计；可空表示未采集元数据）
+confounders:
+  - lighting              # 白天/阴天/黄昏/夜间
+  - background            # 平潮静水/浪花/反光/养殖设施
+  - target_size           # small/medium/large（按 bbox 面积）
+  - weather               # 晴/阴/雨/雾
+
+# 显式样本清单（可选）：
+# 不写时由 location.images 目录自动发现；写了则以本清单为准。
+# samples:
+#   - path: images/test/shot_0001.jpg
+#     conditions: {lighting: daylight, background: calm, target_size: small, weather: sunny}
+#     objects: [{class: foam, bbox: [x1, y1, x2, y2]}]   # 可选，缺省用 labels 目录

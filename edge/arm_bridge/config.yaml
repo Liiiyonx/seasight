@@ -1,0 +1,103 @@
+# ============================================================
+# SeaSight arm bridge configuration
+# ============================================================
+# The bridge subscribes to robot/{device_id}/task and
+# robot/{device_id}/cmd, then translates arm driver results into
+# ACK / progress / telemetry messages.
+
+site_id: "lianjiang"
+device_id: "RBT-ARM-01"
+
+mqtt:
+  host: "localhost"
+  port: 1883
+  username: "robot_device"
+  password: "CHANGE_ME"
+  keepalive: 60
+  use_lwt: true
+
+driver:
+  # simulated = deterministic self test without hardware
+  # http      = generic HTTP adapter example for an arm HTTP SDK
+  backend: "simulated"
+
+  simulated:
+    battery: 100
+    bins:
+      foam: 0.0
+      plastic: 0.0
+      mixed: 0.0
+    home:
+      lng: 119.6540
+      lat: 26.3870
+    collected_weight: 0.05
+    review_result: "confirmed"
+
+  http:
+    endpoint: "http://192.168.1.100:8080/arm"
+    method: "POST"
+    timeout: 10.0
+    headers: {}
+    battery: 100
+    bins:
+      foam: 0.0
+      plastic: 0.0
+      mixed: 0.0
+    home:
+      lng: 119.6540
+      lat: 26.3870
+
+  # New physical arms follow the same shape. Register the driver class in
+  # drivers.py, then select it here by name:
+  #
+  #   backend: "dobot_example"
+  #   dobot_example:
+  #     endpoint: "http://192.168.1.101:8080/dobot"
+  #     ...
+  #
+  # Hiwonder Raspberry Pi bus-servo arms use the vendor SDK on the Pi.
+  # pick_sequence positions are pre-taught servo positions (0..1000), not GPS
+  # coordinates. Record them with the vendor's teach-and-playback example.
+  # Alternatively record with tools/teach_hiwonder_sequence.py and set
+  # pick_sequence_file instead of the inline list below.
+  #
+  # Or keep vendor blocks separate with an explicit kind:
+  vendors:
+    dobot_example:
+      kind: "http"
+      endpoint: "http://192.168.1.101:8080/dobot"
+      method: "POST"
+      timeout: 10.0
+      headers: {}
+      battery: 100
+      bins:
+        foam: 0.0
+        plastic: 0.0
+        mixed: 0.0
+      home:
+        lng: 119.6540
+        lat: 26.3870
+
+    hiwonder_bus_servo:
+      kind: "hiwonder_bus_servo"
+      serial_port: "/dev/ttyAMA0"
+      baudrate: 1000000
+      timeout: 5.0
+      servo_ids: [1, 2, 3, 4]
+      home_positions: [[1, 500], [2, 500]]
+      # pick_sequence_file: "pick_sequence.json"
+      pick_sequence:
+        - duration: 1.0
+          positions: [[1, 650], [2, 500]]
+        - duration: 1.0
+          positions: [[1, 300], [2, 600]]
+      collected_weight: 0.0
+      review_result: "recheck"
+      battery: 100
+      bins:
+        foam: 0.0
+        plastic: 0.0
+        mixed: 0.0
+      home:
+        lng: 119.6540
+        lat: 26.3870

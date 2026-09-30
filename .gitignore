@@ -1,0 +1,118 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+.venv-analysis/
+.venv-nexent/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ===== 环境变量与密钥（核心！绝不提交） =====
+.env
+.env.production
+.env.staging
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+deploy/emqx/bootstrap.production.csv
+D:/VeriCall_data/
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== 数据集与模型权重（体积大，不入库） =====
+ml/datasets/**
+!ml/datasets/.gitkeep
+# WP-06：数据集清单（manifest）是版本化交付物，必须入库
+# （须先否定目录本身，否则被忽略的父目录内无法重新包含文件）
+!ml/datasets/manifests/
+!ml/datasets/manifests/**
+*.pt
+*.onnx
+*.engine
+*.rknn
+*.weights
+*.tflite
+runs/
+wandb/
+
+# ===== 运行时产物 =====
+logs/
+*.log
+uploads/
+data/
+minio_data/
+postgres_data/
+redis_data/
+
+# ===== 本机草稿与隐私产物（绝不提交） =====
+# 从桌面临时素材抽取的中间文本、连江报名表草稿解析结果、个人桌面截图。
+# 这些只服务于本地材料整理，不是可复现的工程证据。
+outputs/
+screenshot_user.png
+
+# 文档渲染中间产物：转换链路会把整页 PNG、草稿 JSON、中间 docx 写在这里，
+# 每次渲染整目录重写，属于产物而不是源文件。
+# ★ 刻意只忽略这一个子目录，**不要图省事写成 `artifacts/`**：
+#   artifacts/agent_evals/latest_v2.json 是 /api/v1/agents/evals/latest 的在线消费源，
+#   把整个 artifacts/ 忽略掉会让这份评测产物从版本控制里消失。
+artifacts/docx-build/
+
+# 部署包与校验清单：deploy_manifest.py 的输出（10MB 级 tar.gz），
+# 是「上传给服务器的产物」而不是源文件；上传后即可删，留着只会撑大仓库。
+artifacts/deploy/
+
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ===== 运行时状态（绝不提交）=====
+# 模拟器把每个设备的 seq 持久化在这里，用于崩溃重启后续号。
+# 这是**运行期状态**，不是配置：
+#   · 提交后别人 clone 下来会带着你的 seq 续跑，两台机器的 seq 撞车
+#   · 平台按 (device_id, seq) 去重，撞车会导致事件被静默丢弃且无报错
+# 删掉它是安全的 —— 下次启动会从 0 重新开始。
+edge/simulator/.simulator_state.json
+.simulator_state.json
+# 真实边缘程序的 seq 持久化（同上，运行期状态）
+edge/.edge_state.json
+.edge_state.json
+
+# ===== 检查脚本的运行产物 =====
+# 自证脚本把逐项结果写在仓库根下，属于运行输出而非源文件。
+# 它每次运行都会被重写，提交上去只会制造无意义的 diff 噪音。
+scripts/selftest_result.txt
+scripts/selftest_events_result.txt
+
+# 临时探针：排查缺陷时随手写的验证脚本与结果，用完即删。
+# 加通配是为了防止某次忘记清理就把一次性代码提交上去。
+scripts/_probe_*
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini

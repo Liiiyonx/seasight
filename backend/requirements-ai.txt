@@ -1,0 +1,30 @@
+# 探海灵眸 SeaSight — AI 推理服务依赖
+# 与 backend/requirements.txt 分离：推理服务只需检测相关依赖，
+# 便于独立部署到边缘设备（Jetson / RK3588）。
+
+# ---- Web 服务 ----
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.17
+
+# ---- 推理引擎 ----
+# CPU / NVIDIA GPU（Jetson 用 jetpack 自带版本，不要 pip 装）
+onnxruntime==1.20.1
+# onnxruntime-gpu==1.20.1       # NVIDIA CUDA 环境改用此项
+# tensorrt                     # TensorRT 加速（需与 CUDA 版本匹配，手工安装）
+# ultralytics==8.3.40          # 仅训练与导出需要，部署机不必装
+
+# ---- 图像处理 ----
+numpy==1.26.4
+# ★ Pillow 必须显式声明：server.py 的 infer() 路径用 PIL 做 letterbox
+#   缩放与灰边填充（不是 opencv）。早期漏列，装完 requirements 后
+#   一旦挂上真实模型就会 ImportError: No module named 'PIL'。
+pillow==11.0.0
+# opencv 用于证据帧画框与格式转换（可选，不影响推理主路径）
+opencv-python-headless==4.10.0.84
+
+# ---- 工具 ----
+pydantic==2.10.3
+pydantic-settings==2.6.1
+loguru==0.7.3
+httpx==0.28.1

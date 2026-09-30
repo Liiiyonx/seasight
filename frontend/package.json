@@ -1,0 +1,26 @@
+{
+  "name": "seasight-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "探海灵眸 SeaSight — 监测大屏与治理平台前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5173"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "echarts": "^5.5.1",
+    "leaflet": "^1.9.4",
+    "mpegts.js": "^1.7.3",
+    "pinia": "^2.2.6",
+    "three": "^0.186.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.3"
+  }
+}

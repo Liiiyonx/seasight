@@ -1,0 +1,80 @@
+# 探海灵眸 SeaSight — 数据集配置
+#
+# YOLO 训练配置。路径按 Ultralytics 约定（train/val 指向图片目录，
+# 标签目录由框架自动从 images/ → labels/ 推导）。
+#
+# 用法：
+#   yolo train data=seasight.yaml model=yolo11s.pt epochs=150
+# 或走本目录脚本：
+#   python ../scripts/train_two_stage.py --data seasight.yaml
+
+# 数据集根目录（相对本文件或绝对路径）
+path: ../datasets/seasight
+
+train: images/train
+val: images/val
+# test: images/test          # 有独立测试集时打开
+
+# 类别定义 —— 顺序即类别索引，绝不能改顺序（改了要重训）
+# 设计依据：连江养殖区实际海漂垃圾构成
+names:
+  0: foam                    # EPS 泡沫浮球及碎片 —— 当地最突出，治理优先级最高
+  1: plastic                 # 塑胶浮球、塑料瓶、塑料袋
+  2: fishing_gear            # 废旧渔网、绳索、饵料包装袋
+  3: other                   # 木板、生活杂物、藻类聚集
+
+# 数据集统计（填充真实数值后训练脚本会做合理性校验）
+# 这几个数字决定了要不要加负样本、要不要用两阶段训练
+# ★ 当前全为 0 = 一张图都没采：check_dataset 与 evaluate_opencv 都会输出
+#   not_evaluated，禁止以空数据生成精度/召回等指标。
+stats:
+  train_images: 0
+  val_images: 0
+  # 纯背景负样本数（无标注框的海面图，用于压制误检）
+  background_images: 0
+  # 各类别实例数
+  instances:
+    foam: 0
+    plastic: 0
+    fishing_gear: 0
+    other: 0
+
+# ---- 评测配置（WP-06，ml/scripts/evaluate_opencv.py 读取）----
+# 数据集清单目录（相对本文件解析；四类清单见 ml/datasets/manifests/README.md）
+evaluation:
+  manifest_dir: ../datasets/manifests
+  iou_threshold: 0.5            # 目标匹配 IoU 门限
+  min_confidence: 0.45          # 与 edge/config.yaml temporal 段一致
+  confounders: [lighting, background, target_size, weather]
+  # 时序链路参数（与 edge/config.yaml temporal 段对齐；76% 抑制率只针对时序链路）
+  temporal:
+    window_frames: 15
+    min_hits: 3
+    grid_size: 64
+    min_confidence: 0.45
+    decimation: 4
+    match_distance: 60.0
+    min_iou: 0.25
+    max_misses: 5
+
+# 训练策略提示（供脚本读取，非 Ultralytics 标准字段）
+strategy:
+  # 小数据集（< 2000 张）→ 用 s 而非 n：n 在海上小目标上召回不足
+  recommended_model: yolo11s.pt
+  # 两阶段：先冻结主干训 head，再全量微调
+  two_stage: true
+  freeze_epochs: 10
+  finetune_epochs: 90
+  # 负样本比例建议（纯背景 : 正样本）
+  background_ratio: 0.25
+  # 小目标密集 → 提高输入分辨率
+  imgsz: 640
+
+# ---- 感知数据协议（WP-13，docs/perception-data-protocol.md）----
+# 标准数据交换格式 SeaSight COCO-like JSON 的工具链入口与校验入口。
+data_protocol:
+  schema_version: "1.0"
+  convert_entry: ml/scripts/convert_annotations.py
+  validate_entry: ml/scripts/validate_dataset_integrity.py
+  calibration_dir: artifacts/calibration
+  protocol_doc: docs/perception-data-protocol.md

@@ -1,0 +1,47 @@
+# 前端构建上下文排除清单
+#
+# ★ 为什么这个文件很关键：
+#   Docker 会把 build context 里**所有**文件打包发给 daemon。
+#   不排除 node_modules 的话，每次构建要传 200MB+ 的文件，
+#   在校园网/4G 环境下光是传输就要好几分钟，而且 COPY . . 会把
+#   宿主机的 node_modules 覆盖进镜像 —— 如果宿主机是 Windows，
+#   里面是 win32 架构的二进制（esbuild 等），容器里直接跑不起来，
+#   报错的形态千奇百怪（最常见是 "You installed esbuild for another
+#   platform"）。排除它是"提速"和"避免架构错乱"两件事一起解决。
+
+node_modules
+**/node_modules
+
+# 构建产物（镜像内会重新 build）
+dist
+dist-ssr
+
+# 编辑器与系统文件
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 环境变量 —— ★ 绝不进镜像
+# Vite 会把 VITE_ 前缀的变量编译进产物，带密钥的 .env 进镜像
+# 等于把密钥发给所有能下载前端 JS 的人。
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# 测试与缓存
+coverage
+.vite
+*.tsbuildinfo

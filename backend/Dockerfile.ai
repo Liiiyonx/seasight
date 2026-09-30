@@ -1,0 +1,36 @@
+# 探海灵眸 SeaSight — AI 推理服务镜像
+# 独立进程，便于算法组单独发版而不影响平台
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    TZ=Asia/Shanghai \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+WORKDIR /app
+
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    fi \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libgomp1 \
+        curl \
+        tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+# 推理依赖（与平台依赖分离，镜像更轻）
+COPY requirements-ai.txt .
+RUN pip install --no-cache-dir -r requirements-ai.txt
+
+# AI 服务代码（挂载自 backend/app/services/ai 与 ml/）
+COPY app/services/ai /app/ai
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8081/infer/health || exit 1
+
+CMD ["uvicorn", "ai.server:app", "--host", "0.0.0.0", "--port", "8081"]
