@@ -7,7 +7,7 @@
         class="brand"
         variant="header"
         :size="32"
-        subtitle="海洋漂浮垃圾智能治理平台"
+        subtitle="海漂垃圾全链路智能治理平台"
       />
 
       <nav class="nav">
@@ -128,6 +128,54 @@
 
     <!-- 演示口径字幕（固定右下角；开关状态全局共享，见 utils/demoCaption.js） -->
     <DemoCaption />
+
+    <!-- 移动端底部 Tab（≤620px 显示，桌面演示不受影响）：
+         9 个导航项在手机上塞不下，取 4 个高频页 +「更多」收纳其余，
+         顶栏导航在手机上整个隐藏，顶栏从两行 97px 回到单行。 -->
+    <nav class="tabbar" aria-label="底部导航">
+      <RouterLink
+        v-for="r in tabbarRoutes"
+        :key="r.path"
+        :to="r.path"
+        class="tabbar__item"
+        active-class="tabbar__item--active"
+      >
+        <span class="tabbar__icon" aria-hidden="true">{{ r.meta.icon }}</span>
+        <span class="tabbar__label">{{ r.meta.title }}</span>
+      </RouterLink>
+      <button
+        class="tabbar__item"
+        type="button"
+        :aria-expanded="showMore"
+        aria-controls="seasight-more-sheet"
+        @click="showMore = !showMore"
+      >
+        <span class="tabbar__icon" aria-hidden="true">⋯</span>
+        <span class="tabbar__label">更多</span>
+      </button>
+    </nav>
+
+    <!-- 「更多」底部抽屉：挂 body 避开 .layout__main 层叠上下文（见下方样式注释） -->
+    <Teleport to="body">
+      <Transition name="sheet-up">
+        <div v-if="showMore" class="more-sheet" role="dialog" aria-label="更多页面">
+          <div class="more-sheet__grid">
+            <RouterLink
+              v-for="r in moreRoutes"
+              :key="r.path"
+              :to="r.path"
+              class="more-sheet__item"
+              active-class="more-sheet__item--active"
+              @click="showMore = false"
+            >
+              <span class="more-sheet__icon" aria-hidden="true">{{ r.meta.icon }}</span>
+              <span>{{ r.meta.title }}</span>
+            </RouterLink>
+          </div>
+          <button class="more-sheet__close" type="button" @click="showMore = false">关闭</button>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -150,6 +198,12 @@ const router = useRouter()
 const navRoutes = routes.filter(
   (r) => r.meta?.title && !r.meta?.noLayout && !r.meta?.hideInNav,
 )
+
+// 移动端底部 Tab：4 个高频页直达，其余收进「更多」抽屉
+const TABBAR_PATHS = ['/dashboard', '/events', '/tasks', '/assistant']
+const tabbarRoutes = navRoutes.filter((r) => TABBAR_PATHS.includes(r.path))
+const moreRoutes = navRoutes.filter((r) => !TABBAR_PATHS.includes(r.path))
+const showMore = ref(false)
 
 // 登录页不渲染主布局（无顶栏/导航）
 const isLoginPage = computed(() => route.name === 'login')
@@ -228,8 +282,19 @@ function onDocumentPointerDown(event) {
 }
 
 function onDocumentKeydown(event) {
-  if (event.key === 'Escape') closeNotif()
+  if (event.key === 'Escape') {
+    closeNotif()
+    showMore.value = false
+  }
 }
+
+// 从「更多」抽屉跳转后收起面板
+watch(
+  () => route.name,
+  () => {
+    showMore.value = false
+  },
+)
 
 // ---------- 时钟 ----------
 const clock = ref('')
@@ -302,21 +367,14 @@ onUnmounted(() => {
   isolation: isolate;
 }
 
-/* ---------- 顶栏（玻璃拟态） ---------- */
+/* ---------- 顶栏（玻璃拟态；外观见下方「iOS 风格覆写」段） ---------- */
 .layout__header {
   position: relative;
   z-index: 300;
   overflow: visible;
-  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 26px;
-  padding: 0 20px;
-  background: rgba(8, 16, 26, 0.55);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border-bottom: 1px solid var(--border);
 }
 
 .brand {
@@ -367,10 +425,7 @@ onUnmounted(() => {
   width: 56%;
 }
 
-.nav__item--active {
-  color: var(--c-primary);
-  background: rgba(24, 224, 200, 0.08);
-}
+/* .nav__item--active 的颜色/背景由下方 iOS 覆写段统一管理 */
 
 .nav__icon {
   font-size: 12px;
@@ -387,15 +442,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
 }
 
-.conn--on { color: var(--c-success); }
-.conn--off { color: var(--c-danger); }
-
 .conn__dot {
-  width: 6px;
-  height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
@@ -410,8 +459,6 @@ onUnmounted(() => {
 }
 
 .clock {
-  font-size: 12px;
-  color: var(--text-sub);
   font-family: 'SF Mono', Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
@@ -427,28 +474,15 @@ onUnmounted(() => {
   color: var(--text-main);
 }
 
-.user__role {
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  color: var(--c-primary);
-  background: rgba(18, 216, 196, 0.1);
-  border: 1px solid rgba(18, 216, 196, 0.22);
-}
+/* .user__role 外观由 iOS 覆写段管理 */
 
 .user__logout {
-  padding: 2px 9px;
   font-size: 11px;
-  color: var(--text-sub);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 3px;
   cursor: pointer;
 }
 
 .user__logout:hover {
   color: var(--text-main);
-  border-color: var(--border-bright);
 }
 
 /* ---------- 口径字幕开关 ---------- */
@@ -521,28 +555,16 @@ onUnmounted(() => {
 }
 
 .notif__badge {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 16px;
   text-align: center;
   color: #fff;
-  background: var(--c-danger);
 }
 
+/* .notif__panel 外观由 iOS 覆写段管理（定位锚定在 .notif 上） */
 .notif__panel {
   position: absolute;
-  top: 32px;
   right: 0;
-  width: 320px;
-  max-height: 420px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   z-index: 360;
   overflow: hidden;
 }
@@ -559,7 +581,6 @@ onUnmounted(() => {
 
 .notif__read {
   font-size: 12px;
-  color: var(--c-primary);
   background: none;
   border: none;
   cursor: pointer;
@@ -567,13 +588,10 @@ onUnmounted(() => {
 
 .notif__list {
   overflow-y: auto;
-  padding: 6px 0;
 }
 
 .notif__item {
   display: flex;
-  gap: 9px;
-  padding: 8px 14px;
 }
 
 .notif__item:hover {
@@ -601,7 +619,6 @@ onUnmounted(() => {
 }
 
 .notif__title {
-  font-size: 12.5px;
   color: var(--text-main);
   line-height: 1.45;
 }
@@ -631,10 +648,9 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
 }
 
-/* ---------- 错误条 ---------- */
+/* ---------- 错误条（外观由 iOS 覆写段管理） ---------- */
 .error-bar {
   position: fixed;
   left: 50%;
@@ -643,27 +659,17 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
-  background: rgba(242, 86, 76, 0.14);
-  border: 1px solid rgba(242, 86, 76, 0.4);
-  border-radius: var(--radius);
-  color: #ffb4ae;
   font-size: 13px;
   z-index: 100;
 }
 
 .error-bar button {
-  padding: 2px 9px;
   font-size: 12px;
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 3px;
   cursor: pointer;
 }
 
 .error-bar button:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--bg-active);
 }
 
 .error-bar__close {
@@ -791,7 +797,7 @@ onUnmounted(() => {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--c-danger);
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 17px;
 }
 
@@ -905,8 +911,32 @@ onUnmounted(() => {
   color: var(--text-main);
 }
 
-@media (max-width: 1560px) {
+/* ★ 顶栏溢出修复：9 个导航项约 890px，加上品牌区与右侧控件组，
+   <1650px（1366/1440/1536 笔记本）必然放不下 —— 之前内容直接溢出容器，
+   激活胶囊压住品牌字标、「双通道对照」被右侧按钮遮挡。
+   方案：允许导航横滑（safe center：未溢出时保持居中，溢出时退化为
+   左对齐且左端可滚回），右缘 24px 渐隐提示可滑，时钟提前隐藏释放宽度。 */
+@media (max-width: 1650px) {
   .brand :deep(.brand-lockup__sub) {
+    display: none;
+  }
+
+  .clock {
+    display: none;
+  }
+
+  .nav {
+    justify-content: flex-start;
+    justify-content: safe center;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-right: 24px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  }
+
+  .nav::-webkit-scrollbar {
     display: none;
   }
 }
@@ -1014,11 +1044,122 @@ onUnmounted(() => {
   }
 }
 
+/* ---------- 移动端底部 Tab（默认隐藏，≤620px 显示） ---------- */
+.tabbar {
+  display: none;
+}
+
+.tabbar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 58px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  color: var(--text-sub);
+  font-size: 10.5px;
+  line-height: 1.2;
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.tabbar__icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.tabbar__item--active,
+.tabbar__item--active:hover {
+  color: var(--c-primary);
+}
+
+/* 「更多」底部抽屉（Teleport 到 body，z-index 高于顶栏 300 / 通知面板 360） */
+.more-sheet {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 410;
+  padding: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.more-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.more-sheet__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  border-radius: 12px;
+  background: var(--bg-panel-2);
+  color: var(--text-sub);
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.more-sheet__item--active,
+.more-sheet__item--active:hover {
+  color: var(--c-primary);
+  background: var(--bg-active);
+}
+
+.more-sheet__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.more-sheet__close {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-hover);
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sheet-up-enter-active,
+.sheet-up-leave-active {
+  transition: transform 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+
+.sheet-up-enter-from,
+.sheet-up-leave-to {
+  transform: translateY(28px);
+  opacity: 0;
+}
+
 @media (max-width: 620px) {
   .clock,
   .user__name,
   .user__role {
     display: none;
+  }
+
+  /* 底部 Tab 接管导航后，顶栏导航隐藏，顶栏回归单行 */
+  .nav {
+    display: none;
+  }
+
+  .layout__header {
+    flex-wrap: nowrap;
   }
 
   .theme-toggle,
@@ -1041,14 +1182,40 @@ onUnmounted(() => {
     display: none;
   }
 
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 320;
+    display: flex;
+    justify-content: space-around;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+    border-top: 1px solid var(--separator);
+  }
+
+  /* 顶栏单行后通知面板跟着上移 */
   .notif__panel {
-    top: 108px;
-    max-height: min(68dvh, 520px);
+    position: fixed;
+    top: 64px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: min(72dvh, 560px);
+    overscroll-behavior: contain;
+  }
+
+  /* 给底部 Tab 留出空间 */
+  .layout__main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
   .error-bar {
     right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     left: 12px;
     transform: none;
     flex-wrap: wrap;

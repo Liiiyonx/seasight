@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end acceptance for the SeaSight MCP server used by Nexent.
+"""End-to-end acceptance for the Oceanus MCP server used by Nexent.
 
 The script starts an isolated Streamable HTTP MCP process and verifies:
 
@@ -10,7 +10,7 @@ The script starts an isolated Streamable HTTP MCP process and verifies:
 * all five Skill files have valid Nexent front matter.
 
 Pass ``--live-api`` to additionally call ``knowledge_list_assets`` through the
-MCP server against a real SeaSight backend. This requires
+MCP server against a real Oceanus backend. This requires
 ``SEASIGHT_API_BASE_URL`` and ``SEASIGHT_API_TOKEN`` in the current environment.
 """
 
@@ -83,8 +83,8 @@ class AcceptanceError(RuntimeError):
     """A failed acceptance condition."""
 
 
-class _MockSeaSightHandler(BaseHTTPRequestHandler):
-    """Minimal SeaSight API used to verify login and token refresh."""
+class _MockOceanusHandler(BaseHTTPRequestHandler):
+    """Minimal Oceanus API used to verify login and token refresh."""
 
     protocol_version = "HTTP/1.1"
     login_count = 0
@@ -189,11 +189,11 @@ class _MockSeaSightHandler(BaseHTTPRequestHandler):
         )
 
 
-class _MockSeaSight:
+class _MockOceanus:
     def __init__(self) -> None:
         self._server = ThreadingHTTPServer(
             ("127.0.0.1", 0),
-            _MockSeaSightHandler,
+            _MockOceanusHandler,
         )
         self._thread = threading.Thread(
             target=self._server.serve_forever,
@@ -403,7 +403,7 @@ async def _exercise_token_refresh(port: int) -> dict[str, Any]:
                     f"first auto-login MCP call failed: {first.content}"
                 )
 
-            _MockSeaSightHandler.reject_next_token = True
+            _MockOceanusHandler.reject_next_token = True
             retried = await session.call_tool(
                 "knowledge_list_assets",
                 {"page": 1, "page_size": 1},
@@ -423,8 +423,8 @@ async def _exercise_token_refresh(port: int) -> dict[str, Any]:
                     f"proactively refreshed MCP call failed: {refreshed.content}"
                 )
 
-    login_count = _MockSeaSightHandler.login_count
-    assets_count = _MockSeaSightHandler.assets_count
+    login_count = _MockOceanusHandler.login_count
+    assets_count = _MockOceanusHandler.assets_count
     if login_count < 3:
         raise AcceptanceError(
             f"expected at least three logins, got {login_count}"
@@ -512,12 +512,12 @@ def _stop_server(process: subprocess.Popen[str]) -> str:
 
 
 def _assert_token_refresh(python: str) -> dict[str, Any]:
-    mock_api = _MockSeaSight()
+    mock_api = _MockOceanus()
     process: subprocess.Popen[str] | None = None
     try:
-        _MockSeaSightHandler.login_count = 0
-        _MockSeaSightHandler.assets_count = 0
-        _MockSeaSightHandler.reject_next_token = False
+        _MockOceanusHandler.login_count = 0
+        _MockOceanusHandler.assets_count = 0
+        _MockOceanusHandler.reject_next_token = False
         mock_api.start()
         port = _free_port()
         process = _start_server(
@@ -549,7 +549,7 @@ def main() -> int:
     parser.add_argument(
         "--live-api",
         action="store_true",
-        help="also call knowledge_list_assets against the configured SeaSight backend",
+        help="also call knowledge_list_assets against the configured Oceanus backend",
     )
     parser.add_argument(
         "--report-path",

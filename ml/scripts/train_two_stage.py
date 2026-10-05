@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 两阶段 YOLO 训练脚本。
+"""探海灵眸 Oceanus — 两阶段 YOLO 训练脚本。
 
 为什么必须两阶段
 ────────────────
@@ -276,7 +276,7 @@ def main() -> int:
     args = parse_args()
 
     print("=" * 66)
-    print("  探海灵眸 SeaSight — YOLO 两阶段训练")
+    print("  探海灵眸 Oceanus — YOLO 两阶段训练")
     print("=" * 66)
 
     data_cfg = load_yaml(Path(args.data))

@@ -242,7 +242,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-如果 SeaSight 与其他应用共用域名，例如挂载在 `https://example.cn/seasight/`，
+如果 Oceanus 与其他应用共用域名，例如挂载在 `https://example.cn/seasight/`，
 不要覆盖宿主机已有的 HTTPS server 块。改为把 `deploy/nginx/seasight-path.conf`
 安装到 `/etc/nginx/snippets/seasight.conf`，再在现有 HTTPS server 块中 include：
 
@@ -468,7 +468,7 @@ make dev-frontend   # vite dev，端口 5173
 ### 2.4.1 接入 Nexent MCP（可选）
 
 `integrations/nexent/` 是独立进程，不依赖机器人，也不直接连接数据库。
-它只调用 SeaSight 后端的 `/api/v1`，因此后端认证、角色、辖区范围、审批、幂等与审计
+它只调用 Oceanus 后端的 `/api/v1`，因此后端认证、角色、辖区范围、审批、幂等与审计
 仍然生效。
 
 ```bash
@@ -557,7 +557,7 @@ HTTP 503，容器 healthcheck 与负载均衡必须使用 `/ready`。响应中�
 ```json
 {
   "status": "down",
-  "app": "SeaSight",
+  "app": "Oceanus",
   "env": "production",
   "ws_connections": 0,
   "dependencies": {
@@ -788,7 +788,7 @@ buffer:
 
 ```ini
 [Unit]
-Description=SeaSight Edge Inference
+Description=Oceanus Edge Inference
 After=network-online.target
 Wants=network-online.target
 

@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 感知数据协议（WP-13）
+# 探海灵眸 Oceanus — 感知数据协议（WP-13）
 
 > 版本：1.0
 > 日期：2026-09-19
@@ -12,9 +12,9 @@
 
 ---
 
-## 1. 冻结格式：SeaSight COCO-like JSON
+## 1. 冻结格式：Oceanus COCO-like JSON
 
-标准数据交换格式固定为 **SeaSight COCO-like JSON**（`schema_version: "1.0"`）。
+标准数据交换格式固定为 **Oceanus COCO-like JSON**（`schema_version: "1.0"`）。
 
 最小顶层字段（12 个，全部必填）：
 
@@ -226,7 +226,7 @@ isolation_violation    bool
 
 ## 6. 标注转换
 
-### 6.1 SeaSight JSON → YOLO txt（训练/评测准备）
+### 6.1 Oceanus JSON → YOLO txt（训练/评测准备）
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
@@ -238,7 +238,7 @@ $env:PYTHONIOENCODING='utf-8'
 - 归一化由 `bbox` 与图片 `width/height` 计算；越界（<=0 或 >1）的框 → 坏样本跳过并列出。
 - 报告同时输出到 stdout 与 `--report` 指定的 JSON。
 
-### 6.2 YOLO txt → SeaSight JSON（导入入口）
+### 6.2 YOLO txt → Oceanus JSON（导入入口）
 
 ```powershell
 .\.venv-analysis\Scripts\python.exe ml\scripts\convert_annotations.py from-yolo `

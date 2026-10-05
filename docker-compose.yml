@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 一键启动全套依赖服务
+# 探海灵眸 Oceanus — 一键启动全套依赖服务
 # 用法：docker compose up -d
 # 参考 fastapi/full-stack-fastapi-template 与 Mediamtx 社区实践组织
 
@@ -23,7 +23,10 @@ services:
       # 分区要随日期持续补，initdb.d 只在首次初始化跑一次，不能替代。
       - ./deploy/postgres:/sql:ro
     ports:
-      - "5432:5432"
+      # ★ 宿主机侧改用 15432：本机已有原生 postgres.exe 在跑并占着 5432
+      # （2026-10-05 实测，PID 7416）。容器内仍是 5432，只有宿主机映射变了。
+      # 需要从宿主机直连数据库时用 15432。
+      - "15432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seasight} -d ${POSTGRES_DB:-seasight}"]
       interval: 10s
@@ -44,7 +47,8 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      # ★ 同上：本机原生 redis-server 占着 6379（PID 5904），宿主侧改用 16379
+      - "16379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -62,10 +66,35 @@ services:
       EMQX_DASHBOARD__DEFAULT_USERNAME: ${MQTT_DASHBOARD_USER:-admin}
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${MQTT_DASHBOARD_PASSWORD:-CHANGE_ME}
       EMQX_ALLOW_ANONYMOUS: "false"
+      # ★ 认证链：内置数据库 + sha256(salt 后缀)。
+      #   EMQX 5.8 没有 bootstrap.csv 的一次性导入机制（6.x 才有），
+      #   所以用环境变量声明认证链，用户与 ACL 由
+      #   scripts/setup_emqx_auth.py 通过 REST API 写入内置数据库。
+      #   格式：完整 HOCON 片段，注入到 authentication 配置项。
+      EMQX_AUTHENTICATION: >-
+        [{"mechanism":"password_based","backend":"built_in_database","user_id_type":"username"}]
+      EMQX_AUTHORIZATION__NO_MATCH: deny
+      EMQX_AUTHORIZATION__SOURCES__1__TYPE: file
+      EMQX_AUTHORIZATION__SOURCES__1__ENABLE: "true"
+      EMQX_AUTHORIZATION__SOURCES__1__PATH: "/opt/emqx/etc/oceanus_acl.conf"
+      EMQX_AUTHORIZATION__SOURCES__2__TYPE: built_in_database
+      EMQX_AUTHORIZATION__SOURCES__2__ENABLE: "true"
       TZ: Asia/Shanghai
     volumes:
-      # 启动时自动导入认证与 ACL 配置（见 deploy/emqx/bootstrap.csv）
-      - ./deploy/emqx/bootstrap.csv:/opt/emqx/data/bootstrap.csv:ro
+      # ★ 用 HOCON 片段开认证链，而不是 bootstrap.csv ——
+      #   bootstrap 的数据导入机制是 EMQX **6.x** 才有的，5.8 上不生效
+      #   （2026-10-05 实测：`emqx ctl import data` 命令不存在，
+      #     用户库为空 + allow_anonymous=false → 所有连接被拒）。
+      #   5.8 的做法：这里开认证链，用户与 ACL 由
+      #   scripts/setup_emqx_auth.py 通过 REST API 写入内置数据库。
+      # ★ 认证链通过**环境变量**注入，不改 emqx.conf。
+      #   两轮实测的教训：
+      #     1) 挂成 oceanus.conf 不生效 —— EMQX 不 include 任意 .conf
+      #     2) 直接覆盖 emqx.conf 会让容器起不来 —— 启动脚本要读
+      #        node.data_dir / node.name / node.cookie 等必需项，
+      #        报 call_hocon_failed + validation_error，容器无限重启。
+      #   环境变量是 EMQX 官方支持的方式，且优先级最高。
+      - ./deploy/emqx/oceanus_acl.conf:/opt/emqx/etc/oceanus_acl.conf:ro
       - emqx_data:/opt/emqx/data
     ports:
       - "1883:1883"   # MQTT
@@ -199,7 +228,10 @@ services:
       # 它们靠 `Path(__file__).parents[4]` 反推仓库根，容器内即 `/`，故挂到 /edge。
       - ./edge:/edge:ro
     ports:
-      - "8000:8000"
+      # ★ 宿主机侧 18000：本机 8000 被 wslrelay + Docker Desktop 代理占着
+      #   （2026-10-05 实测 com.docker.backend PID 56700 已绑 0.0.0.0:8000）。
+      #   容器内仍是 8000，只有宿主机映射变了，应用侧无感。
+      - "18000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks: [seasight]
 

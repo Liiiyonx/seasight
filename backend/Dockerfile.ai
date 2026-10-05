@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — AI 推理服务镜像
+# 探海灵眸 Oceanus — AI 推理服务镜像
 # 独立进程，便于算法组单独发版而不影响平台
 FROM python:3.11-slim
 

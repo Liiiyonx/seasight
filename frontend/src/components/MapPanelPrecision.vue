@@ -1145,7 +1145,7 @@ onUnmounted(() => {
 .map-source-badge small {
   grid-column: 2;
   color: #71808a;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.3;
 }
 
@@ -1384,7 +1384,7 @@ onUnmounted(() => {
   border-radius: 7px 0 0 0;
   background: rgba(255, 255, 255, 0.72);
   color: #63717a;
-  font-size: 9px;
+  font-size: 10px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }

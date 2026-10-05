@@ -16,14 +16,12 @@ The self test proves the MQTT contract only (E1/E2). It is not physical
 pickup evidence and does not imply detection accuracy.
 """
 
-from __future__ import annotations
-
 import argparse
 import signal
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 HERE = Path(__file__).resolve().parent
 EDGE = HERE.parent
@@ -41,16 +39,16 @@ from device_sim.transport import MemoryTransport  # noqa: E402
 DEFAULT_CONFIG = HERE / "config.yaml"
 
 
-def _load_config(path: Path) -> dict[str, Any]:
+def _load_config(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
 
 
-def build_driver(cfg: dict[str, Any], backend: str | None) -> Any:
+def build_driver(cfg: Dict[str, Any], backend: Optional[str]) -> Any:
     driver_cfg = cfg.get("driver", {})
     return build_arm_driver(driver_cfg, backend)
 
 
-def run_self_test(cfg: dict[str, Any]) -> int:
+def run_self_test(cfg: Dict[str, Any]) -> int:
     """Run one dispatch through an in-memory transport and exit."""
     # Deliberately simulated: the self test proves the MQTT contract without
     # touching a physical arm or a vendor HTTP endpoint. Driver resolution is
@@ -98,7 +96,7 @@ def run_self_test(cfg: dict[str, Any]) -> int:
     return 0
 
 
-def check_driver(cfg: dict[str, Any], backend: str | None) -> int:
+def check_driver(cfg: Dict[str, Any], backend: Optional[str]) -> int:
     """Build the named driver from registry + config without calling it."""
     try:
         driver = build_driver(cfg, backend)
@@ -109,7 +107,84 @@ def check_driver(cfg: dict[str, Any], backend: str | None) -> int:
     return 0
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def _mqtt_with_env_overrides(mqtt_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """用环境变量覆盖 MQTT 配置。
+
+    ★ 为什么必须有这个：`config.yaml` 是**进仓库的文件**，绝不能写真实密码。
+      密码只落在 `.env`（已 gitignore），由部署脚本导出成环境变量注入。
+
+    映射规则（``ARM_`` 前缀优先，便于同一台机器上后端与设备用不同账号）::
+
+        ARM_MQTT_HOST     → host
+        ARM_MQTT_PORT     → port
+        ARM_MQTT_USERNAME → username
+        ARM_MQTT_PASSWORD → password
+
+    若未设 ``ARM_`` 变量，则回退到通用的 ``MQTT_HOST`` / ``MQTT_PORT`` /
+    ``MQTT_USERNAME`` / ``MQTT_PASSWORD``（后端服务用的那套）。
+
+    也支持在 mqtt 段写 ``password_env: "ARM_MQTT_PASSWORD"`` 显式指定
+    变量名，避免多套命名时搞混。
+    """
+    import os
+
+    merged = dict(mqtt_cfg or {})
+
+    # 显式声明优先：password_env: XXX
+    explicit = merged.get("password_env")
+    if explicit:
+        value = os.environ.get(str(explicit))
+        if value:
+            merged["password"] = value
+
+    for key, env_names in (
+        ("host", ("ARM_MQTT_HOST", "MQTT_HOST")),
+        ("username", ("ARM_MQTT_USERNAME", "MQTT_USERNAME")),
+        ("password", ("ARM_MQTT_PASSWORD", "MQTT_PASSWORD")),
+    ):
+        # ★ 只有配置里是**占位符或空**时才用环境变量覆盖 ——
+        #   否则会把运维在 config.yaml 里精心设的值冲掉。
+        #   ★ 但 `host` 额外加一条：`localhost` 对树莓派是**错的**
+        #   （broker 跑在开发电脑上，不在树莓派本机），所以也允许覆盖。
+        placeholder = merged.get(key) in (None, "", "CHANGE_ME")
+        if key == "host" and merged.get(key) == "localhost":
+            placeholder = True
+        if placeholder:
+            for name in env_names:
+                value = os.environ.get(name)
+                if value:
+                    merged[key] = value
+                    break
+
+    for key, env_names in (("port", ("ARM_MQTT_PORT", "MQTT_PORT")),):
+        if not merged.get(key):
+            for name in env_names:
+                value = os.environ.get(name)
+                if value:
+                    try:
+                        merged[key] = int(value)
+                    except ValueError:
+                        pass
+                    break
+
+    # ★ 路演：云端只开 443，设备要走 MQTT-over-WebSocket 才能连公网。
+    #   ARM_MQTT_TRANSPORT=ws + ARM_MQTT_PATH=/mqtt（需与 nginx location 一致）
+    for key, env_names in (
+        ("transport", ("ARM_MQTT_TRANSPORT",)),
+        ("path", ("ARM_MQTT_PATH",)),
+    ):
+        if not merged.get(key):
+            for name in env_names:
+                value = os.environ.get(name)
+                if value:
+                    merged[key] = value
+                    break
+    # host 给了域名/IP 时，port 与 transport 往往要一起改
+    # （云端 443 + wss；本机 8083 + ws）。这里不猜，交给环境变量显式指定。
+    return merged
+
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument("--dry-run", action="store_true", help="no broker; run self test")
@@ -125,7 +200,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     cfg = _load_config(Path(args.config))
 
@@ -137,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
 
     device_id = args.device_id or str(cfg["device_id"])
     site_id = args.site_id or str(cfg["site_id"])
-    mqtt_cfg = cfg.get("mqtt", {})
+    mqtt_cfg = _mqtt_with_env_overrides(cfg.get("mqtt", {}))
 
     transport = MqttTransport(
         host=str(mqtt_cfg.get("host", "localhost")),
@@ -148,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
         keepalive=int(mqtt_cfg.get("keepalive", 60)),
         use_lwt=bool(mqtt_cfg.get("use_lwt", True)),
         will_topic=f"marine/{site_id}/{device_id}/status",
+        # ★ 路演场景：云端只开 443，设备走 MQTT-over-WebSocket。
+        #   由 ARM_MQTT_TRANSPORT=ws 开启，path 需与 nginx location 一致。
+        transport=str(mqtt_cfg.get("transport", "tcp")),
+        path=str(mqtt_cfg.get("path", "/mqtt")),
     )
     bridge = ArmBridge(
         device_id=device_id,

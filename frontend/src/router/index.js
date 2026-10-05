@@ -117,7 +117,7 @@ router.beforeEach((to) => {
 
 router.afterEach((to) => {
   const title = to.meta?.title
-  document.title = title ? `${title} · 探海灵眸 SeaSight` : '探海灵眸 SeaSight'
+  document.title = title ? `${title} · 探海灵眸 Oceanus` : '探海灵眸 Oceanus'
 })
 
 export default router

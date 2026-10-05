@@ -398,7 +398,7 @@ defineExpose({ play, destroy })
   position: absolute;
   top: -16px;
   left: -1px;
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 4px;
   background: inherit;
   color: #fff;

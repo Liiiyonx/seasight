@@ -852,7 +852,7 @@ WebSocket 只推**增量**。若前端丢消息，数据会永久缺失且不自
 ```json
 {
   "status": "degraded",
-  "app": "SeaSight",
+  "app": "Oceanus",
   "env": "production",
   "ws_connections": 3,
   "dependencies": {

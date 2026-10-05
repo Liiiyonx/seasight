@@ -53,7 +53,7 @@ from app.services.agents.errors import AgentNotFoundError, TaskConflictError
 from app.services.agents.model import AgentRun, AgentRunRequest, AgentStep, Expectation, RuleStep
 from app.services.agents.repositories import ApprovalRecord
 
-logger = logging.getLogger("seasight.agents.persistent")
+logger = logging.getLogger("oceanus.agents.persistent")
 
 # ----------------------------------------------------------------------
 # 脱敏（解密预算）—— 键名命中即整体丢弃，字符串值中的敏感词替换

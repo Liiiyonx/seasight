@@ -1,5 +1,9 @@
 <template>
-  <section class="login-demo" aria-labelledby="demo-account-title">
+  <!--
+    ★ accounts 为空（生产构建未注入 VITE_DEMO_ACCOUNTS）时整个面板不渲染。
+      演示前要它出现：设 VITE_DEMO_ACCOUNTS 后重新 npm run build。
+-->
+  <section v-if="accounts.length" class="login-demo" aria-labelledby="demo-account-title">
     <div class="login-demo__head">
       <div>
         <h3 id="demo-account-title" class="login-demo__title">测试账号</h3>
@@ -15,7 +19,7 @@
         class="login-demo__item"
         :class="{ 'login-demo__item--filled': filled === account.username }"
         type="button"
-        :aria-label="`填入${account.label}账号 ${account.username}，密码 ${account.password}`"
+        :aria-label="`填入${account.label}账号 ${account.username}`"
         @click="$emit('fill', account)"
       >
         <span class="login-demo__avatar" :class="`login-demo__avatar--${account.tone}`">
@@ -26,7 +30,15 @@
           <span class="login-demo__credentials">
             <code>{{ account.username }}</code>
             <span class="login-demo__slash">/</span>
-            <code>{{ account.password }}</code>
+            <!--
+              ★ 口令默认打码。原先明文显示，会同时泄漏到三处：
+              截图（→ 软著材料 / 答辩PPT）、投屏、公开仓库。
+              需要现场演示明文时设 VITE_SHOW_DEMO_PASSWORD=1 重新构建。
+              无论开关如何，aria-label 都不带口令 —— 读屏会念出来，
+              等于把口令念给全场听。
+            -->
+            <code v-if="showPassword">{{ account.password }}</code>
+            <code v-else aria-hidden="true">{{ masked }}</code>
           </span>
         </span>
         <span class="login-demo__action">
@@ -44,38 +56,51 @@ defineProps({
 
 defineEmits(['fill'])
 
-const accounts = [
-  {
-    username: 'admin',
-    password: 'admin123456',
-    label: '系统管理员 · 全部权限',
-    short: '管',
-    tone: 'blue',
-  },
-  {
-    username: 'operator',
-    password: 'operator123456',
-    label: '乡镇操作员 · 马鼻镇辖区',
-    short: '操',
-    tone: 'green',
-  },
-  {
-    // 审批员是独立账号：演示「人机协同」时由第二个人（手机端）批准，
-    // 拍到的是权限分离，而不是同一个人自己批自己。
-    username: 'approver',
-    password: 'approver123456',
-    label: '值班审批员 · 高风险动作放行',
-    short: '审',
-    tone: 'orange',
-  },
-  {
-    username: 'viewer',
-    password: 'viewer123456',
-    label: '访客 · 只读大屏',
-    short: '访',
-    tone: 'gray',
-  },
-]
+/**
+ * 是否明文显示演示口令。
+ * 默认 false —— 演示时点一下就能填入，并不需要看见口令。
+ */
+const showPassword = import.meta.env.VITE_SHOW_DEMO_PASSWORD === '1'
+
+/** 打码占位：固定长度，避免从位数泄露口令长度 */
+const masked = '••••••••'
+
+/**
+ * 演示账号表。
+ *
+ * ★ 口令**不在源码里**，改由构建期环境变量注入：
+ *     VITE_DEMO_ACCOUNTS='[{"username":"admin","password":"...","label":"系统管理员","short":"管","tone":"blue"}]'
+ *   未配置时 accounts 为空数组，面板整体不渲染 ——
+ *   这样生产构建的产物里**不会残留任何明文口令**。
+ *
+ * 为什么这样改：原先口令硬编码在源码里，会同时泄漏到
+ *   ①打包产物 → 公开仓库
+ *   ②登录页截图 → 软著材料 / 答辩 PPT
+ *   ③aria-label → 读屏软件把口令念给全场听
+ * 三条路都堵住，才算真解决。
+ */
+const accounts = parseDemoAccounts(import.meta.env.VITE_DEMO_ACCOUNTS)
+
+/** 解析 env 里的 JSON 账号表；任何异常都退化为空，绝不让构建失败 */
+function parseDemoAccounts(raw) {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((a) => a && a.username)
+      .map((a) => ({
+        username: String(a.username),
+        password: String(a.password || ''),
+        label: String(a.label || a.username),
+        short: String(a.short || a.username.slice(0, 1)),
+        tone: ['blue', 'green', 'orange', 'gray'].includes(a.tone)
+          ? a.tone : 'blue',
+      }))
+  } catch {
+    return []
+  }
+}
 </script>
 
 <style scoped>
@@ -112,7 +137,7 @@ const accounts = [
   border-radius: 999px;
   background: var(--bg-active);
   color: var(--c-primary);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 1px;
 }

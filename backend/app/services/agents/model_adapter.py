@@ -132,7 +132,7 @@ DEFAULT_MODEL_SCHEMA: dict[str, Any] = {
     },
 }
 
-_LOGGER = logging.getLogger("seasight.agents.model_adapter")
+_LOGGER = logging.getLogger("oceanus.agents.model_adapter")
 
 
 # ----------------------------------------------------------------------
@@ -288,7 +288,7 @@ class OpenAICompatibleModelClient:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "SeaSight-Agent/1.0",
+            "User-Agent": "Oceanus-Agent/1.0",
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"

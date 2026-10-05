@@ -152,7 +152,8 @@ onBeforeUnmount(() => {
 @media (max-width: 620px) {
   .demo-caption {
     right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    /* 上移避开移动端底部 Tab 栏（见 App.vue .tabbar） */
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     font-size: 11.5px;
   }
 }

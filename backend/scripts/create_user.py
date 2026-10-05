@@ -1,4 +1,4 @@
-"""Create or update a SeaSight account without using demo seed data."""
+"""Create or update a Oceanus account without using demo seed data."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from app.models.misc import User, UserRole
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Create or update a SeaSight user")
+    parser = argparse.ArgumentParser(description="Create or update a Oceanus user")
     parser.add_argument("--username", required=True)
     parser.add_argument("--role", required=True, choices=UserRole.ALL)
     parser.add_argument("--full-name", default=None)

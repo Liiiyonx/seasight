@@ -18,7 +18,7 @@ from ml.scripts import evaluate_opencv as ev
 
 
 def _minimal_protocol(tmp_path: Path, *, evidence: str = "E1", dataset_type: str = "synthetic") -> Path:
-    """构造最小合法 SeaSight COCO-like 协议 JSON。"""
+    """构造最小合法 Oceanus COCO-like 协议 JSON。"""
     data = {
         "schema_version": "1.0",
         "dataset_id": "synthetic_test_wp16",

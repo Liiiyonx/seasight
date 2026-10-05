@@ -79,7 +79,17 @@
             :phase="snapshot.phase || fallbackPhase"
             :state="state"
           />
-          <ArmSimConsole v-else />
+          <!--
+            把工单上下文传进去：演示叙事是「带着平台派的单去执行」，
+            而不是「打开另一个软件」。mapTarget 可能是 {lng,lat} 也可能
+            是字符串（不同接口的约定不同），统一格式化成字符串再传。
+          -->
+          <ArmSimConsole
+            v-else
+            :task-id="taskId"
+            :target="armTaskTarget"
+            :servos="armServoTelemetry"
+          />
         </div>
         <div v-if="loading" class="sim-map__loading">
           <span class="sim-map__spinner"></span>
@@ -426,6 +436,17 @@ const mapTarget = computed(() => {
   return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : null
 })
 
+/** 喂给 ArmSimConsole 的任务上下文文案（工单号 + 目标坐标）。 */
+const armTaskTarget = computed(() => {
+  const t = mapTarget.value
+  if (!t) return ''
+  if (typeof t === 'string') return t
+  const lng = Number(t.lng)
+  const lat = Number(t.lat)
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return ''
+  return `${lng.toFixed(4)}, ${lat.toFixed(4)}`
+})
+
 const STATE_LABELS = {
   idle: '等待启动',
   running: '运行中',
@@ -517,6 +538,21 @@ const telemetryItems = computed(() => {
         (taskId.value && item.task_id === taskId.value),
     )
     .slice(0, 60)
+})
+
+/**
+ * 最新一条遥测里的逐舵机读数，喂给 ArmSimConsole 的舵机面板。
+ * ★ 由机械臂驱动回读（t_track.servo_telemetry），不是平台自报 ——
+ *   所以它能作为"真机真的执行了"的证据。取最新一条即可：
+ *   遥测是持续上报的，旧的没有展示价值。
+ */
+const armServoTelemetry = computed(() => {
+  const items = telemetryItems.value
+  for (let i = 0; i < items.length; i += 1) {
+    const s = items[i]?.servo_telemetry || items[i]?.servos
+    if (s && typeof s === 'object' && Object.keys(s).length) return s
+  }
+  return {}
 })
 
 const logItems = computed(() =>
@@ -1137,7 +1173,7 @@ onUnmounted(() => {
 .sim-section__hint {
   color: var(--text-dim);
   font-family: 'SF Mono', Consolas, monospace;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 400;
 }
 
@@ -1194,7 +1230,7 @@ onUnmounted(() => {
 .sim-timeline__item time {
   color: var(--text-dim);
   font-family: 'SF Mono', Consolas, monospace;
-  font-size: 10px;
+  font-size: 10.5px;
   text-align: right;
 }
 
@@ -1288,7 +1324,7 @@ onUnmounted(() => {
   background: var(--bg-panel-2);
   color: inherit;
   font-family: 'SF Mono', Consolas, monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
   line-height: 17px;
 }
 
@@ -1315,7 +1351,7 @@ onUnmounted(() => {
   padding-top: 2px;
   color: var(--text-dim);
   font-family: 'SF Mono', Consolas, monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 
 .sim-stream__tag {
@@ -1325,7 +1361,7 @@ onUnmounted(() => {
   border-radius: 5px;
   background: var(--bg-panel-2);
   color: var(--text-sub);
-  font-size: 9.5px;
+  font-size: 10.5px;
   text-align: center;
   white-space: nowrap;
 }
@@ -1368,7 +1404,7 @@ onUnmounted(() => {
 .sim-stream__body code {
   color: var(--text-dim);
   font-family: 'SF Mono', Consolas, monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 
 .sim-stream__empty {

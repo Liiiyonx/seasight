@@ -1,4 +1,21 @@
-"""Generate EMQX's one-time bootstrap CSV from a production env file."""
+"""已废弃 —— 不要用这个脚本（2026-10-05）。
+
+它生成 bootstrap.csv，指望 EMQX 启动时导入。但 **EMQX 5.8 没有这个机制**
+（那是 6.x 才有的数据导入功能）。实测：
+
+    $ docker compose exec emqx emqx ctl import data <file>
+    Error: unknown command      # 只列出 gateway-* 命令
+
+日志零导入记录；etc/*.conf 无任何 authenticator 配置。叠加
+``allow_anonymous=false`` 的后果是**所有 MQTT 连接被拒**。
+
+正确做法::
+
+    python scripts/setup_emqx_auth.py --env-file .env.production \
+        --dashboard-url http://127.0.0.1:18083
+
+详见 docs/competitions/cloud-mqtt-wss-deploy.md
+"""
 
 from __future__ import annotations
 

@@ -19,7 +19,24 @@ export function classLabel(code) {
   return WASTE_CLASSES[code]?.label || code || '未知'
 }
 
+/**
+ * 类别取色：优先读当前主题的 CSS 变量（--c-foam 等，深浅主题各有覆盖），
+ * 读不到（如单元测试无 DOM）时退回 WASTE_CLASSES 里的浅色默认值。
+ * 注意：只在绘制/初始化时求值一次的调用方（canvas、Leaflet marker），
+ * 主题切换后已画好的内容不会自动重绘 —— 属可接受偏差，新绘制会用新色。
+ */
 export function classColor(code) {
+  const map = {
+    foam: '--c-foam',
+    plastic: '--c-plastic',
+    fishing_gear: '--c-fishing',
+    other: '--c-other',
+  }
+  const name = map[code]
+  if (name && typeof window !== 'undefined' && typeof getComputedStyle === 'function') {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name)
+    if (v && v.trim()) return v.trim()
+  }
   return WASTE_CLASSES[code]?.color || '#8e8e93'
 }
 

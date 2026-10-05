@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     command = f"{sys.executable} {' '.join(sys.argv)}"
 
     print("=" * 70)
-    print("探海灵眸 SeaSight — WP-05/WP-12 Agent 评测系统（E1 确定性离线评测）")
+    print("探海灵眸 Oceanus — WP-05/WP-12 Agent 评测系统（E1 确定性离线评测）")
     print("=" * 70)
     head = git_head_short_hash(ROOT)
     print(f"代码版本：git HEAD = {head or 'unknown'}")

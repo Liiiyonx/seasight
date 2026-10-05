@@ -21,6 +21,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -46,6 +47,15 @@ class Track(Base):
     bin_mixed: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
 
     speed: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+
+    # 逐舵机遥测（电压/温度/位置），由机械臂驱动回读后随telemetry 上报。
+    # ★ 证据链价值：这些数字来自舵机本身，是"机械臂真的动了"的硬证据；
+    #   而 status 字段是平台自报。答辩被问"怎么证明真机执行了"，
+    #   拿这个出来比架构图有说服力。非真机（仿真/无舵机）时为 NULL。
+    servo_telemetry: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )

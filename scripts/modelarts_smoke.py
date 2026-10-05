@@ -2,7 +2,7 @@
 """Call one real OpenAI-compatible model endpoint and write an evidence record.
 
 The endpoint is configured through the same environment variables as the
-SeaSight planner adapter:
+Oceanus planner adapter:
 
     AGENT_MODEL_BASE_URL
     AGENT_MODEL_API_KEY
@@ -163,7 +163,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     headers: dict[str, str] = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "SeaSight-ModelArtsSmoke/1.0",
+        "User-Agent": "Oceanus-ModelArtsSmoke/1.0",
     }
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"

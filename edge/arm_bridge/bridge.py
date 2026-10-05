@@ -1,4 +1,4 @@
-"""MQTT contract bridge between SeaSight and any physical arm.
+"""MQTT contract bridge between Oceanus and any physical arm.
 
 Responsibilities:
 
@@ -15,13 +15,11 @@ Evidence level: E1/E2. Passing self tests proves the protocol loop under a
 deterministic transport, not physical pickup or field acceptance.
 """
 
-from __future__ import annotations
-
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 
 HERE = Path(__file__).resolve().parent
 EDGE = HERE.parent
@@ -64,10 +62,10 @@ class ArmBridge:
         device_id: str,
         site_id: str,
         driver: ArmDriver,
-        transport: DeviceTransport | None = None,
+        transport: Optional[DeviceTransport] = None,
         *,
-        clock: Clock | None = None,
-        id_factory: IdFactory | None = None,
+        clock: Optional[Clock] = None,
+        id_factory: Optional[IdFactory] = None,
     ) -> None:
         self.device_id = str(device_id)
         self.site_id = str(site_id)
@@ -84,15 +82,15 @@ class ArmBridge:
         self.status_topic = f"marine/{self.site_id}/{self.device_id}/status"
 
         self._started = False
-        self._acked: dict[str, Ack] = {}
-        self.history: dict[str, list[Any]] = {
+        self._acked: Dict[str, Ack] = {}
+        self.history: Dict[str, List[Any]] = {
             "commands": [],
             "acks": [],
             "progress": [],
             "telemetry": [],
         }
-        self.events: list[dict[str, Any]] = []
-        self.counter: dict[str, int] = {
+        self.events: List[Dict[str, Any]] = []
+        self.counter: Dict[str, int] = {
             "commands_processed": 0,
             "commands_invalid": 0,
             "commands_rejected": 0,
@@ -138,13 +136,13 @@ class ArmBridge:
             qos=1,
         )
 
-    def receive_command(self, command: DeviceCommand | dict[str, Any]) -> None:
+    def receive_command(self, command: Union[DeviceCommand, Dict[str, Any]]) -> None:
         """Inject a command directly (tests and self-test mode)."""
         if isinstance(command, dict):
             command = DeviceCommand.from_dict(command)
         self._handle_command(command, self.clock.now())
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> Dict[str, Any]:
         status = self.driver.status()
         return {
             "device_id": self.device_id,
@@ -157,7 +155,7 @@ class ArmBridge:
     # ------------------------------------------------------------------
     # Inbound commands
     # ------------------------------------------------------------------
-    def _on_message(self, topic: str, payload: dict[str, Any]) -> None:
+    def _on_message(self, topic: str, payload: Dict[str, Any]) -> None:
         try:
             command = DeviceCommand.from_dict(payload)
         except (KeyError, TypeError, ValueError) as exc:
@@ -361,7 +359,7 @@ class ArmBridge:
         self,
         *,
         status: str,
-        task_id: str | None,
+        task_id: Optional[str],
         location: Position,
         now: float,
     ) -> None:
@@ -377,6 +375,10 @@ class ArmBridge:
             "task_id": task_id,
             "speed": driver_status.speed,
             "heading": driver_status.heading,
+            # ★ 逐舵机遥测（电压/温度/位置）。这是"机械臂真的动了"的
+            #   硬证据 —— status 字段是平台自报，这里的数字来自舵机本身。
+            #   采集不到时是空 dict，不会让整条消息失败。
+            "servos": dict(getattr(driver_status, "servos", {}) or {}),
         }
         self.transport.publish(self.telemetry_topic, payload, qos=0)
         self.history["telemetry"].append(payload)

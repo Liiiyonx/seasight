@@ -1,8 +1,8 @@
 {
-  "name": "seasight-frontend",
+  "name": "oceanus-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "探海灵眸 SeaSight — 监测大屏与治理平台前端",
+  "description": "探海灵眸 Oceanus — 监测大屏与治理平台前端",
   "type": "module",
   "scripts": {
     "dev": "vite",

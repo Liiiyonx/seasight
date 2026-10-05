@@ -104,7 +104,7 @@ def local_dist_is_stale(dist_dir: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="核对线上 SeaSight 构建版本（只读）")
+    parser = argparse.ArgumentParser(description="核对线上 Oceanus 构建版本（只读）")
     parser.add_argument("--url", default=DEFAULT_URL, help="线上入口（默认生产路径前缀）")
     parser.add_argument("--dist", default=None, help="本地构建目录（默认自动找 frontend/dist）")
     parser.add_argument(

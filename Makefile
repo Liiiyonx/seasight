@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 常用命令
+# 探海灵眸 Oceanus — 常用命令
 # 用法：make <target>     查看全部：make help
 
 .PHONY: help up down restart logs ps db-init knowledge-demo-seed check-demo-approval bootstrap-demo-users demo-approval-up demo-approval-down deploy-package deploy-verify db-reset migrate migrate-stamp migration migrate-history migrate-sql upgrade-pending dev-backend dev-frontend nexent-install nexent-mcp nexent-check nexent-acceptance knowledge-evolution-demo modelarts-smoke simulate demo smoke check check-api check-gitignore check-contract check-contract-selftest check-events-selftest check-dispatch-selftest check-finalize-selftest check-pel-selftest check-evidence-scripts-selftest check-data check-data-stats test test-edge test-cv-selftest vision-compare-export run-edge run-edge-demo test-all test-browser fault-acceptance prod-config prod-build prod-up prod-down prod-logs prod-ps prod-mqtt-bootstrap prod-migrate-stamp prod-migrate prod-create-admin prod-bootstrap-demo-users prod-track-partitions ensure-partitions check-demo-accounts check-public-repo-privacy clean
@@ -130,7 +130,7 @@ nexent-install:  ## 安装 Nexent MCP 独立运行环境
 	$(NEXENT_PYTHON) -m pip install -r integrations/nexent/mcp_server/requirements.txt
 	@echo "[nexent-install] 完成。请复制 integrations/nexent/.env.example 为 .env 并填写令牌"
 
-nexent-mcp:  ## 启动 SeaSight Nexent MCP（默认 stdio）
+nexent-mcp:  ## 启动 Oceanus Nexent MCP（默认 stdio）
 	$(NEXENT_PYTHON) integrations/nexent/mcp_server/server.py
 
 nexent-check:  ## 检查 Nexent MCP 配置与可导入性
@@ -272,8 +272,17 @@ prod-logs:  ## 查看生产日志
 prod-ps:  ## 查看生产服务状态
 	$(PROD_COMPOSE) ps
 
-prod-mqtt-bootstrap:  ## 从 .env.production 生成 EMQX 首次启动凭据
-	$(PYTHON) scripts/generate_emqx_bootstrap.py
+# ⚠️ 已废弃（2026-10-05）—— EMQX **5.8 不支持** bootstrap.csv 的一次性数据导入
+#    （那是 6.x 才有的机制；实测 `emqx ctl import data` → unknown command）。
+#    保留这个目标只为兼容既有流程，**不要**用它建用户。
+#    正确做法：python scripts/setup_emqx_auth.py --env-file .env.production \
+#              --dashboard-url http://127.0.0.1:18083
+#    详见 docs/competitions/cloud-mqtt-wss-deploy.md
+prod-mqtt-bootstrap:  ## [已废弃] 见 docs/competitions/cloud-mqtt-wss-deploy.md
+	@echo "警告：EMQX 5.8 不支持 bootstrap.csv 导入，此目标已废弃。" >&2
+	@echo "请改用：python scripts/setup_emqx_auth.py --env-file .env.production" >&2
+	@echo "        --dashboard-url http://127.0.0.1:18083" >&2
+	@exit 1
 
 prod-migrate-stamp:  ## 生产新库首次部署：将当前 01_schema.sql 标记到 Alembic head
 	$(PROD_COMPOSE) exec -T backend python -m alembic -c alembic.ini stamp head

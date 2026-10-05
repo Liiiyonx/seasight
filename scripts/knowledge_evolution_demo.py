@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the knowledge evolution loop against a real SeaSight /api/v1 backend.
+"""Run the knowledge evolution loop against a real Oceanus /api/v1 backend.
 
 The script exercises the complete internal loop:
 
@@ -80,7 +80,7 @@ def redact(value: Any) -> Any:
 
 
 class ApiClient:
-    """Minimal JSON client for the SeaSight /api/v1 HTTP contract."""
+    """Minimal JSON client for the Oceanus /api/v1 HTTP contract."""
 
     def __init__(self, base_url: str, token: str) -> None:
         self.base_url = str(base_url or "").rstrip("/")
@@ -98,7 +98,7 @@ class ApiClient:
         headers: dict[str, str] = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "SeaSight-KnowledgeEvolutionDemo/1.0",
+            "User-Agent": "Oceanus-KnowledgeEvolutionDemo/1.0",
         }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
@@ -170,7 +170,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--base-url",
         default=DEFAULT_BASE_URL,
-        help="SeaSight API base URL, for example http://127.0.0.1:8000/api/v1",
+        help="Oceanus API base URL, for example http://127.0.0.1:8000/api/v1",
     )
     parser.add_argument(
         "--username",

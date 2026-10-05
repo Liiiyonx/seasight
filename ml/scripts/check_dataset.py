@@ -95,7 +95,7 @@ def _load_protocol_validator():
 
 
 def check_protocol_json(path: Path, protocol) -> int:
-    """校验 SeaSight COCO-like JSON（WP-13 数据协议）；返回阻断问题数。
+    """校验 Oceanus COCO-like JSON（WP-13 数据协议）；返回阻断问题数。
 
     复用 convert_annotations.validate_dataset（冻结校验核心），不重复实现；
     check_files/check_checksums 关闭（数据体检不要求图片与校验和就位）。
@@ -231,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         default=[],
         metavar="PATH",
-        help="SeaSight COCO-like JSON 路径（WP-13 数据协议），可多次指定；逐一做协议级校验，无效计为阻断问题",
+        help="Oceanus COCO-like JSON 路径（WP-13 数据协议），可多次指定；逐一做协议级校验，无效计为阻断问题",
     )
     args = ap.parse_args(argv)
 

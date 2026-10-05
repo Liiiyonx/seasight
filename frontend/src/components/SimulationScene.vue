@@ -432,7 +432,7 @@ defineExpose({
 
 .sim-scene__joint span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .sim-scene__joint code {

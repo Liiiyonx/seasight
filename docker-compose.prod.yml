@@ -1,4 +1,4 @@
-# SeaSight production stack.
+# Oceanus production stack.
 #
 # Use:
 #   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
@@ -77,14 +77,36 @@ services:
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${MQTT_DASHBOARD_PASSWORD:?set MQTT_DASHBOARD_PASSWORD}
       EMQX_ALLOW_ANONYMOUS: "false"
       TZ: Asia/Shanghai
+      # ★ 认证链与授权源（2026-10-05 补齐，此前 prod 段**完全没有**这两项，
+      #   而 EMQX 5.8 又不支持 bootstrap.csv 的一次性导入 ——
+      #   结果是 allow_anonymous=false 且用户库为空 → 所有 MQTT 连接被拒）。
+      #   用环境变量声明是 5.8 的可行方式（试过挂 .conf 与覆盖 emqx.conf，
+      #   前者不生效、后者让容器起不来）。
+      EMQX_AUTHENTICATION: >-
+        [{"mechanism":"password_based","backend":"built_in_database","user_id_type":"username"}]
+      EMQX_AUTHORIZATION__NO_MATCH: deny
+      EMQX_AUTHORIZATION__SOURCES__1__TYPE: file
+      EMQX_AUTHORIZATION__SOURCES__1__ENABLE: "true"
+      EMQX_AUTHORIZATION__SOURCES__1__PATH: "/opt/emqx/etc/oceanus_acl.conf"
+      EMQX_AUTHORIZATION__SOURCES__2__TYPE: built_in_database
+      EMQX_AUTHORIZATION__SOURCES__2__ENABLE: "true"
     volumes:
       # Generate this file with `make prod-mqtt-bootstrap` after filling
       # .env.production. It is gitignored because it contains password hashes.
       - ./deploy/emqx/bootstrap.production.csv:/opt/emqx/data/bootstrap.csv:ro
+      # ACL 兜底规则（ASCII-only，见文件头说明：EMQX 用 erl_scan 解析，
+      # 中文注释会报 illegal character 让节点拒启动）
+      - ./deploy/emqx/oceanus_acl.conf:/opt/emqx/etc/oceanus_acl.conf:ro
       - emqx_prod_data:/opt/emqx/data
     ports:
       - "${MQTT_BIND_ADDR:-127.0.0.1}:1883:1883"
       - "127.0.0.1:${MQTT_DASHBOARD_PORT:-18083}:18083"
+      # ★ 8083 = MQTT over WebSocket。路演现场设备只能走 HTTPS/WSS
+      #   （公网不开 1883），nginx 用 443 /mqtt 反代到这里。
+      #   ★ EMQX 5.8 的 WS 监听**要求子协议 Sec-WebSocket-Protocol: mqtt**，
+      #     缺了返回 HTTP 400（设备侧已在 _ws_opts() 带上该头）。
+      #   ★ 只绑 127.0.0.1：公网不能直接访问，必须经 nginx 的 443。
+      - "127.0.0.1:${MQTT_WS_PORT:-8083}:8083"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18083/status"]
       interval: 15s

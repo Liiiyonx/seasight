@@ -25,6 +25,7 @@
   --c-plastic: #007aff;
   --c-fishing: #ff3b30;
   --c-other: #8e8e93;
+  --c-assigned: #5856d6;
 
   --bg-page: #f2f2f7;
   --bg-panel: #ffffff;
@@ -69,6 +70,7 @@ html[data-theme='dark'] {
   --c-plastic: #0a84ff;
   --c-fishing: #ff453a;
   --c-other: #98989d;
+  --c-assigned: #a6a4ff;
 
   --bg-page: #000000;
   --bg-panel: #1c1c1e;

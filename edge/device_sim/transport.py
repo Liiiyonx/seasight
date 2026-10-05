@@ -19,13 +19,12 @@
 下可复现，不代表真实 MQTT 或真实边缘盒接入。
 """
 
-from __future__ import annotations
-
 from collections import deque
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Dict, List, Tuple
+from .py36_compat import Protocol
 
 #: 订阅回调签名：收到 (topic, payload_dict)
-MessageHandler = Callable[[str, dict[str, Any]], None]
+MessageHandler = Callable[[str, Dict[str, Any]], None]
 
 
 class DeviceTransport(Protocol):
@@ -38,7 +37,7 @@ class DeviceTransport(Protocol):
 
     def disconnect(self) -> None: ...
 
-    def publish(self, topic: str, payload: dict[str, Any], qos: int = 1) -> bool: ...
+    def publish(self, topic: str, payload: Dict[str, Any], qos: int = 1) -> bool: ...
 
     def subscribe(self, topic: str, handler: MessageHandler) -> None: ...
 
@@ -58,9 +57,9 @@ class MemoryTransport:
 
     def __init__(self) -> None:
         self.connected = True
-        self._handlers: dict[str, list[MessageHandler]] = {}
-        self.published: list[tuple[str, dict[str, Any], int]] = []
-        self.delivered: list[tuple[str, dict[str, Any], int]] = []
+        self._handlers: Dict[str, List[MessageHandler]] = {}
+        self.published: List[Tuple[str, Dict[str, Any], int]] = []
+        self.delivered: List[Tuple[str, Dict[str, Any], int]] = []
 
     # ---------------- 连接状态 ----------------
     def connect(self) -> None:
@@ -70,7 +69,7 @@ class MemoryTransport:
         self.connected = False
 
     # ---------------- 发布 ----------------
-    def publish(self, topic: str, payload: dict[str, Any], qos: int = 1) -> bool:
+    def publish(self, topic: str, payload: Dict[str, Any], qos: int = 1) -> bool:
         """设备 → 平台方向。未连接时返回 False 且不投递。"""
         self.published.append((topic, payload, qos))
         if not self.connected:
@@ -95,7 +94,7 @@ class MemoryTransport:
             self._handlers.pop(topic, None)
 
     # ---------------- 入站注入（平台 → 设备） ----------------
-    def deliver(self, topic: str, payload: dict[str, Any], qos: int = 1) -> bool:
+    def deliver(self, topic: str, payload: Dict[str, Any], qos: int = 1) -> bool:
         """把一条入站报文（平台下发的命令）注入总线，路由给订阅者。
 
         设备离线（``connected=False``）时入站被丢弃，返回 False。
@@ -107,12 +106,12 @@ class MemoryTransport:
         return True
 
     # ---------------- 内部 ----------------
-    def _route(self, topic: str, payload: dict[str, Any], qos: int) -> None:
+    def _route(self, topic: str, payload: Dict[str, Any], qos: int) -> None:
         for handler in list(self._handlers.get(topic, ())):
             handler(topic, payload)
 
     # ---------------- 只读快照 ----------------
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> Dict[str, Any]:
         return {
             "connected": self.connected,
             "published": [(t, p, q) for t, p, q in self.published],
@@ -135,10 +134,10 @@ class RecordingTransport:
 
     def __init__(self, inner: DeviceTransport) -> None:
         self.inner = inner
-        self.by_topic: dict[str, list[dict[str, Any]]] = {}
+        self.by_topic: Dict[str, List[Dict[str, Any]]] = {}
 
     def subscribe(self, topic: str, handler: MessageHandler) -> None:
-        def wrapper(t: str, payload: dict[str, Any]) -> None:
+        def wrapper(t: str, payload: Dict[str, Any]) -> None:
             self.by_topic.setdefault(t, []).append(payload)
             handler(t, payload)
 

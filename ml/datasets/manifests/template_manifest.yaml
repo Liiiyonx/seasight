@@ -1,6 +1,6 @@
 # ============================================================
 # 数据集清单模板（template_manifest.yaml）
-# 探海灵眸 SeaSight — WP-06 数据集隔离机制
+# 探海灵眸 Oceanus — WP-06 数据集隔离机制
 #
 # 新增清单必须逐字段对齐本模板，字段说明见注释。
 # schema_version 升级时，评测脚本与 ml/tests 必须同步跟进。
@@ -36,7 +36,7 @@ data_type: planned
 #   planned→E0；synthetic→E1|E2（最高 E2）；quasi_real→E2；real→E3（E4 需合同凭证）
 evidence_level: E0
 
-# WP-13 数据协议关联（可选）：指向 SeaSight COCO-like JSON（ground-truth/标注真值）。
+# WP-13 数据协议关联（可选）：指向 Oceanus COCO-like JSON（ground-truth/标注真值）。
 # 填写后评测脚本优先以该 JSON 的标注为真值（经 convert_annotations 校验），
 # 并以 JSON 内 evidence_level 约束输出证据等级；留空则走 YOLO labels。
 # protocol_ref: datasets/seasight/test_YYYYMMDD/dataset.json
@@ -55,7 +55,7 @@ annotation:
   format: yolo_txt        # 当前仅支持 YOLO txt：class cx cy w h（归一化）
   iou_threshold: 0.5      # 评测匹配 IoU 门限（可在 seasight.yaml evaluation 段覆盖）
 
-# WP-13 数据协议关联（可选）：指向 SeaSight COCO-like JSON（docs/perception-data-protocol.md）。
+# WP-13 数据协议关联（可选）：指向 Oceanus COCO-like JSON（docs/perception-data-protocol.md）。
 # 提供时评测脚本（--gt-json）以协议 JSON 为 ground-truth 来源（经协议校验：
 # 跳过坏样本、拒绝越级证据、检测泄漏）；与 labels 二选一或都给（协议优先）。
 protocol_ref: null         # 示例: ../seasight_test/dataset.json

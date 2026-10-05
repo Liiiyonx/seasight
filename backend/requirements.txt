@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 后端依赖
+# 探海灵眸 Oceanus — 后端依赖
 # Python 3.11+
 
 # ---- Web 框架 ----

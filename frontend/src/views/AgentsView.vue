@@ -813,6 +813,7 @@ import { aiApi, agentsApi } from '@/api'
 import ChartPanel from '@/components/ChartPanel.vue'
 import { useRealtimeStore } from '@/stores/realtime'
 import { canWrite, getUser } from '@/utils/auth'
+import { palette } from '@/utils/palette'
 import { fmtTime, fmtShortTime } from '@/utils/format'
 
 // ---------- query 直达支持（router props：?run=<run_id> 自动展开，?page=<n> 直达页码） ----------
@@ -1686,16 +1687,17 @@ const evalRadarOption = computed(() => {
     const v = radarValue(m)
     return v == null ? null : Number(v.toFixed(4))
   })
+  const p = palette()
   return {
     tooltip: { trigger: 'item' },
     radar: {
       indicator: indicators,
       radius: '62%',
       center: ['50%', '52%'],
-      axisName: { color: '#8b96a8', fontSize: 10.5 },
-      splitLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.24)' } },
-      splitArea: { areaStyle: { color: ['rgba(142, 142, 147, 0.04)', 'rgba(142, 142, 147, 0.02)'] } },
-      axisLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.28)' } },
+      axisName: { color: p.axisLabel, fontSize: 10.5 },
+      splitLine: { lineStyle: { color: p.splitLine } },
+      splitArea: { areaStyle: { color: p.splitArea } },
+      axisLine: { lineStyle: { color: p.axisLine } },
     },
     series: [
       {
@@ -1705,9 +1707,9 @@ const evalRadarOption = computed(() => {
           {
             value: values,
             name: '质量指标',
-            lineStyle: { width: 2, color: '#007aff' },
-            itemStyle: { color: '#007aff' },
-            areaStyle: { color: 'rgba(0, 122, 255, 0.18)' },
+            lineStyle: { width: 2, color: p.primary },
+            itemStyle: { color: p.primary },
+            areaStyle: { color: p.primaryGlow },
           },
         ],
       },
@@ -1859,17 +1861,17 @@ onBeforeUnmount(() => {
   background: currentColor;
 }
 
-.runtime-badge--idle { color: var(--c-success); border-color: rgba(61, 220, 132, 0.4); }
+.runtime-badge--idle { color: var(--c-success); border-color: color-mix(in srgb, var(--c-success) 40%, transparent); }
 .runtime-badge--running {
   color: var(--c-primary);
-  border-color: rgba(24, 224, 200, 0.45);
+  border-color: color-mix(in srgb, var(--c-primary) 45%, transparent);
 }
 .runtime-badge--running .runtime-badge__dot {
   animation: pulse-ring 1.8s ease-out infinite;
 }
-.runtime-badge--unavailable { color: var(--c-danger); border-color: rgba(242, 86, 76, 0.45); }
+.runtime-badge--unavailable { color: var(--c-danger); border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); }
 .runtime-badge--loading { color: var(--text-sub); }
-.runtime-badge--error { color: var(--c-danger); border-color: rgba(242, 86, 76, 0.45); }
+.runtime-badge--error { color: var(--c-danger); border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); }
 .runtime-badge--unknown { color: var(--text-sub); }
 
 /* ---------- 全局状态横幅 ---------- */
@@ -1883,9 +1885,9 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
-.agents__banner--failed { background: rgba(242, 86, 76, 0.1); border-color: rgba(242, 86, 76, 0.45); }
-.agents__banner--unavailable { background: rgba(245, 166, 35, 0.1); border-color: rgba(245, 166, 35, 0.45); }
-.agents__banner--degraded { background: rgba(245, 166, 35, 0.08); border-color: rgba(245, 166, 35, 0.4); }
+.agents__banner--failed { background: color-mix(in srgb, var(--c-danger) 10%, transparent); border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); }
+.agents__banner--unavailable { background: color-mix(in srgb, var(--c-warn) 10%, transparent); border-color: color-mix(in srgb, var(--c-warn) 45%, transparent); }
+.agents__banner--degraded { background: color-mix(in srgb, var(--c-warn) 8%, transparent); border-color: color-mix(in srgb, var(--c-warn) 40%, transparent); }
 
 .agents__banner-title { font-weight: 600; color: var(--text-main); }
 .agents__banner-text { color: var(--text-sub); }
@@ -2003,10 +2005,10 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   vertical-align: 1px;
 }
-.agents__chip--replay { color: var(--c-info); border-color: rgba(74, 158, 255, 0.4); }
-.agents__chip--warn { color: var(--c-warn); border-color: rgba(245, 166, 35, 0.4); }
-.agents__chip--ok { color: var(--c-success); border-color: rgba(61, 220, 132, 0.4); }
-.agents__chip--no { color: var(--c-danger); border-color: rgba(242, 86, 76, 0.4); }
+.agents__chip--replay { color: var(--c-info); border-color: color-mix(in srgb, var(--c-info) 40%, transparent); }
+.agents__chip--warn { color: var(--c-warn); border-color: color-mix(in srgb, var(--c-warn) 40%, transparent); }
+.agents__chip--ok { color: var(--c-success); border-color: color-mix(in srgb, var(--c-success) 40%, transparent); }
+.agents__chip--no { color: var(--c-danger); border-color: color-mix(in srgb, var(--c-danger) 40%, transparent); }
 
 .agents__count-badge {
   padding: 1px 9px;
@@ -2130,15 +2132,15 @@ onBeforeUnmount(() => {
 }
 
 .role--assess {
-  color: #7a5af8;
-  border-color: rgba(122, 90, 248, 0.35);
-  background: rgba(122, 90, 248, 0.1);
+  color: var(--c-assigned);
+  border-color: color-mix(in srgb, var(--c-assigned) 35%, transparent);
+  background: color-mix(in srgb, var(--c-assigned) 10%, transparent);
 }
 
 .role--dispatch {
-  color: #007aff;
-  border-color: rgba(0, 122, 255, 0.3);
-  background: rgba(0, 122, 255, 0.09);
+  color: var(--c-primary);
+  border-color: color-mix(in srgb, var(--c-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--c-primary) 9%, transparent);
 }
 
 .role--other {
@@ -2255,8 +2257,8 @@ onBeforeUnmount(() => {
 .lesson__scope {
   padding: 1px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, #7a5af8 12%, transparent);
-  color: #7a5af8;
+  background: color-mix(in srgb, var(--c-assigned) 12%, transparent);
+  color: var(--c-assigned);
 }
 
 .lesson__kind { color: var(--text-dim); font-size: 11px; }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 感知数据集完整性校验入口（WP-13）。
+"""探海灵眸 Oceanus — 感知数据集完整性校验入口（WP-13）。
 
 包装 `convert_annotations.validate_dataset`，提供独立 CLI：
 
@@ -42,10 +42,10 @@ from convert_annotations import (  # noqa: E402
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="validate_dataset_integrity",
-        description="SeaSight COCO-like JSON 数据集完整性校验（WP-13）",
+        description="Oceanus COCO-like JSON 数据集完整性校验（WP-13）",
     )
     ap.add_argument("--input", action="append", required=True,
-                    help="SeaSight JSON 路径；可多次指定以做跨文件泄漏检测")
+                    help="Oceanus JSON 路径；可多次指定以做跨文件泄漏检测")
     ap.add_argument("--images-root", default=None, help="数据集根目录（校验图片路径/校验和）")
     ap.add_argument("--no-check-files", action="store_true")
     ap.add_argument("--no-check-checksums", action="store_true")

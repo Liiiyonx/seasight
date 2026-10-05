@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Responsive UI audit for the SeaSight frontend.
+ * Responsive UI audit for the Oceanus frontend.
  *
  * The project acceptance suite covers business behavior at a desktop viewport.
  * This lightweight companion checks the presentation layer at desktop and

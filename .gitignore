@@ -25,6 +25,9 @@ htmlcov/
 .env.staging
 .env.local
 .env.*.local
+# gen_local_secrets.py 的自动备份 —— 含真实凭据，同样禁止提交
+.env.bak
+.env.*.bak
 *.pem
 *.key
 secrets/
@@ -116,3 +119,70 @@ scripts/_probe_*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ===== 2026-10 仓库卫生 =====
+# 下面这些是调试期的临时产物：VNC 截图、PPT/文档构建中间件、
+# 搜索引擎抓取的页面快照。它们曾因未跟踪而在一次会话里悬了很久，
+# 任何一次 git clean -fd 都会连坐删除真正想留的东西。
+# 保留规则：需要留存的证据显式add 进 artifacts/，不进版本库的按下面挡住。
+
+# 小程序构建产物与依赖（源码在 miniprogram/src，要入库的是它）
+miniprogram/node_modules/
+miniprogram/dist/
+miniprogram/.temp/
+miniprogram/.swc/
+
+# 一次性调试截图（VNC / 浏览器 / 录屏）
+# ★ 刻意**不用** *.png / *.jpg 通配 —— 那会连带挡掉
+#   frontend/public/icon-*.png 这类 PWA 必须入库的资源。
+#   gitignore 只影响未跟踪文件，已入库的产物不受影响。
+slide-*.png
+slide-*.jpg
+screenshot_tab*.png
+ecs-vnc-*.png
+vnc-*.png
+.tmp-vnc-*.png
+ui-review-screenshots/
+evidence/
+
+# 搜索/抓取页面快照（一次性调研用）
+bing_*.html
+baidu_*.html
+
+# 文档与 PPT 构建中间脚本（产物才是交付物，脚本是一次性的）
+build_ppt.py
+build_ppt.mjs
+complete_docx.py
+patch_docx.py
+inspect_docx.py
+inspect_pptx.py
+
+# 工具自身的工作目录
+.codex-*/
+.codex
+
+# 华为云私有环境截图：含账号 ID、区域、VPC/子网/安全组配置。
+# 属真实环境画像，且未被任何文档引用 —— 提交前请先脱敏。
+docs/competitions/private-env-page*.png
+docs/competitions/agent-edit-state.png
+
+# 答辩 PPT 交付物：单文件 10MB，且文件名含姓名+手机号。
+# 属对外提交物而非源码，留在本地/比赛平台，不进版本库。
+# 提交前请先去掉文件名中的个人信息。
+deliverables/
+
+# WorkBuddy 会话记忆：本地工作记录，不属于项目资产
+.workbuddy/
+
+# 工具自身的单文件产物（上面的 .codex-*/ 只挡目录）
+.codex-*.png
+
+# 前端渲染探针的截图产物（结论在提交信息与脚本里，图片不入库）
+frontend/artifacts/
+
+# 探针用的临时构建产物（用 vite --outDir dist-xxx 产出，验完即弃）
+frontend/dist-verify/
+frontend/dist-probe/
+frontend/dist-nx/
+frontend/dist-tele/
+frontend/dist-tele2/

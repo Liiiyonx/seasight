@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 边缘感知模拟器。
+"""探海灵眸 Oceanus — 边缘感知模拟器。
 
 模拟**边缘盒**（岸基摄像头旁的计算单元）的完整行为，用于在没有真实
 设备的情况下驱动平台演示。它复刻了真实边缘盒里几个容易做错的关键点：
@@ -995,7 +995,7 @@ class EdgeSimulator:
         )
 
         print("=" * 66)
-        print("  探海灵眸 SeaSight — 边缘感知模拟器")
+        print("  探海灵眸 Oceanus — 边缘感知模拟器")
         print("=" * 66)
         print(f"  站点         : {self.site_id}")
         print(f"  设备数       : {len(self.devices)} 台（合计速率倍率 {total_rate:.1f}）")
@@ -1138,7 +1138,7 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="探海灵眸 SeaSight — 边缘感知模拟器",
+        description="探海灵眸 Oceanus — 边缘感知模拟器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"

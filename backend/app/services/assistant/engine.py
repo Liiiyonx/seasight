@@ -55,7 +55,7 @@ from app.services.assistant.tools import (
     tool_descriptors,
 )
 
-_LOG = logging.getLogger("seasight.assistant.engine")
+_LOG = logging.getLogger("oceanus.assistant.engine")
 
 # ----------------------------------------------------------------------
 # 规则意图词表（冻结在本模块：规则兜底是「未配模型时的诚实降级」，
@@ -80,7 +80,7 @@ _MAX_CHAT_DEPTH = 4
 # 对话专用 system prompt（与派单规划的 DEFAULT_MODEL_SYSTEM_PROMPT 独立：
 # 那是英文规划器，这里是中文对话助手）
 _CHAT_SYSTEM_PROMPT = (
-    "你是「探海灵眸 SeaSight」海漂垃圾监测平台的对话助手。"
+    "你是「探海灵眸 Oceanus」海漂垃圾监测平台的对话助手。"
     "能力：查询海漂垃圾事件、查看平台运营统计、对事件给出就近派单建议；"
     "用户上传的图片由系统直接检测并把结果放进对话，你不需请求。"
     "规则：派单只生成建议，最终确认由用户在前端完成；"

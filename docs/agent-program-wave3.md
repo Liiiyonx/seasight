@@ -170,7 +170,7 @@ device_fault_recovery_rate
 WP-13 新增的标准数据交换格式固定为：
 
 ```text
-SeaSight COCO-like JSON
+Oceanus COCO-like JSON
 ```
 
 最小顶层字段：
@@ -446,7 +446,7 @@ ml/datasets/manifests/**
 
 ### 实现要求
 
-- 标注转换器至少支持 SeaSight COCO-like JSON，并为 YOLO 文本标注提供明确转换入口。
+- 标注转换器至少支持 Oceanus COCO-like JSON，并为 YOLO 文本标注提供明确转换入口。
 - 导入时必须校验图片路径、类别、bbox、面积、重复 ID、跨 split 泄漏和校验和。
 - 标定工具支持棋盘格内参、畸变参数和简单平面映射；没有图像时必须明确失败，不得给默认假参数。
 - 输出报告必须包括输入文件哈希、样本数、类别分布、跳过的坏样本和 evidence level。

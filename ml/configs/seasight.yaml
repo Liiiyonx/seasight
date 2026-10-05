@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 数据集配置
+# 探海灵眸 Oceanus — 数据集配置
 #
 # YOLO 训练配置。路径按 Ultralytics 约定（train/val 指向图片目录，
 # 标签目录由框架自动从 images/ → labels/ 推导）。
@@ -71,7 +71,7 @@ strategy:
   imgsz: 640
 
 # ---- 感知数据协议（WP-13，docs/perception-data-protocol.md）----
-# 标准数据交换格式 SeaSight COCO-like JSON 的工具链入口与校验入口。
+# 标准数据交换格式 Oceanus COCO-like JSON 的工具链入口与校验入口。
 data_protocol:
   schema_version: "1.0"
   convert_entry: ml/scripts/convert_annotations.py

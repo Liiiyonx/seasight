@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — AI 推理服务依赖
+# 探海灵眸 Oceanus — AI 推理服务依赖
 # 与 backend/requirements.txt 分离：推理服务只需检测相关依赖，
 # 便于独立部署到边缘设备（Jetson / RK3588）。
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Incremental vs full re-extraction evaluation (E1, deterministic).
 
-Compares the deterministic ontology candidate extractor used by the SeaSight
+Compares the deterministic ontology candidate extractor used by the Oceanus
 knowledge service in two maintenance modes after one asset version is
 appended:
 

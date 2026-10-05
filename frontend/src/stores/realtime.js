@@ -125,8 +125,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
         robotsApi.list(),
       ])
       stats.value = s || {}
-      devices.value = d?.items || d || []
-      robots.value = r?.items || r || []
+      // ★ 同上：显式判 Array。接口返回 {} 时 `d?.items || d` 会因{}
+      //   是真值而返回 {}，下游渲染/ 展开会抛。
+      devices.value = Array.isArray(d?.items) ? d.items : Array.isArray(d) ? d : []
+      robots.value = Array.isArray(r?.items) ? r.items : Array.isArray(r) ? r : []
       error.value = ''
     } catch (err) {
       error.value = err.message || '数据加载失败'
@@ -138,7 +140,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
   async function loadEvents({ hours = 24, limit = 50 } = {}) {
     try {
       const res = await eventsApi.list({ hours, page: 1, page_size: limit })
-      const items = res?.items || res || []
+      //★ 必须显式判 Array：`res?.items || res || []` 在 res = {} 时
+      //   会因 {} 是真值而返回 {}，随后 for...of {} 直接抛
+      //   "items is not iterable"。接口少给一个字段就能让整页白屏。
+      const raw = res?.items ?? res
+      const items = Array.isArray(raw) ? raw : []
       // 保留已经通过 WebSocket 推来的高亮状态
       const seen = new Set(recentEvents.value.map((e) => e.event_id))
       const merged = [...recentEvents.value]
@@ -156,7 +162,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   async function loadHeatmap({ hours = 24, gridSize = 500 } = {}) {
     try {
       const res = await eventsApi.heatmap({ hours, grid_size: gridSize })
-      heatmap.value = res || []
+      heatmap.value = Array.isArray(res) ? res : []
     } catch (err) {
       // 热力图失败不阻断大屏其余部分
       console.warn('[热力图] 加载失败：', err.message)

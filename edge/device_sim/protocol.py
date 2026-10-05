@@ -22,13 +22,11 @@
 真实边缘盒或现场验证。
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
-from dataclasses import dataclass, field
+from .py36_compat import Protocol, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Protocol
+from typing import Any, Dict, List, Optional, Tuple
 
 # ----------------------------------------------------------------------
 # 冻结常量
@@ -36,7 +34,7 @@ from typing import Any, Protocol
 
 #: 设备命令动作（冻结集合）。`ack` 是保留动作：孪生收到后做回执确认，
 #: 不触发模式迁移（用于把冻结命令表补全，语义上等价平台侧 ping）。
-COMMAND_ACTIONS: tuple[str, ...] = (
+COMMAND_ACTIONS: Tuple[str, ...] = (
     "dispatch",
     "pause",
     "resume",
@@ -46,7 +44,7 @@ COMMAND_ACTIONS: tuple[str, ...] = (
 )
 
 #: 遥测最小字段（冻结集合，`to_dict()` 必须全部出现）。
-TELEMETRY_FIELDS: tuple[str, ...] = (
+TELEMETRY_FIELDS: Tuple[str, ...] = (
     "device_id",
     "seq",
     "timestamp",
@@ -60,7 +58,7 @@ TELEMETRY_FIELDS: tuple[str, ...] = (
 )
 
 #: 故障码（冻结集合，外加 "none"）。
-FAULT_CODES: tuple[str, ...] = (
+FAULT_CODES: Tuple[str, ...] = (
     "ack_timeout",
     "duplicate_ack",
     "out_of_order_ack",
@@ -73,7 +71,7 @@ FAULT_CODES: tuple[str, ...] = (
 
 #: 多故障并存时，遥测 `fault_code` 只上报一个主故障，优先级从高到低。
 #: 顺序即优先级：emergency_stop 最高。
-FAULT_PRIORITY: tuple[str, ...] = (
+FAULT_PRIORITY: Tuple[str, ...] = (
     "emergency_stop",
     "communication_lost",
     "battery_critical",
@@ -97,7 +95,7 @@ class DeviceMode:
     PAUSED = "paused"
     E_STOP = "emergency_stop"
 
-    ALL: tuple[str, ...] = (IDLE, NAVIGATING, COLLECTING, RETURNING, PAUSED, E_STOP)
+    ALL: Tuple[str, ...] = (IDLE, NAVIGATING, COLLECTING, RETURNING, PAUSED, E_STOP)
 
 
 # ----------------------------------------------------------------------
@@ -122,7 +120,7 @@ class FakeClock:
         self._now += max(0.0, float(seconds))
 
     @staticmethod
-    def iso(t: float | None = None, timespec: str = "seconds") -> str:
+    def iso(t: Optional[float] = None, timespec: str = "seconds") -> str:
         """把 epoch 秒格式化为 UTC ISO-8601（默认到秒，可字典序比较）。"""
         moment = datetime.fromtimestamp(t, tz=timezone.utc) if t is not None else datetime.now(timezone.utc)
         return moment.isoformat(timespec=timespec)
@@ -156,11 +154,11 @@ class Position:
     lng: float
     lat: float
 
-    def to_dict(self) -> dict[str, float]:
+    def to_dict(self) -> Dict[str, float]:
         return {"lng": round(float(self.lng), 6), "lat": round(float(self.lat), 6)}
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Position":
+    def from_dict(cls, data: Dict[str, Any]) -> "Position":
         return cls(lng=float(data["lng"]), lat=float(data["lat"]))
 
 
@@ -179,9 +177,9 @@ class DeviceCommand:
     issued_at: float
     expires_at: float
     action: str
-    params: dict[str, Any] = field(default_factory=dict)
+    params: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "command_id": self.command_id,
             "device_id": self.device_id,
@@ -195,7 +193,7 @@ class DeviceCommand:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DeviceCommand":
+    def from_dict(cls, data: Dict[str, Any]) -> "DeviceCommand":
         """从报文 dict 解析；缺信封字段抛 ``KeyError``（由调用方捕获）。"""
         return cls(
             command_id=str(data["command_id"]),
@@ -228,7 +226,7 @@ class Ack:
     reason: str = ""
     mode: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "ack_id": self.ack_id,
             "command_id": self.command_id,
@@ -242,7 +240,7 @@ class Ack:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Ack":
+    def from_dict(cls, data: Dict[str, Any]) -> "Ack":
         return cls(
             ack_id=str(data["ack_id"]),
             command_id=str(data["command_id"]),
@@ -264,13 +262,13 @@ class Telemetry:
     timestamp: float
     mode: str
     battery: int
-    position: Position | None
+    position: Optional[Position]
     velocity: float
-    bin_usage: dict[str, float]
-    mission_id: str | None
+    bin_usage: Dict[str, float]
+    mission_id: Optional[str]
     fault_code: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "device_id": self.device_id,
             "seq": int(self.seq),
@@ -286,7 +284,7 @@ class Telemetry:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Telemetry":
+    def from_dict(cls, data: Dict[str, Any]) -> "Telemetry":
         pos = data.get("position")
         return cls(
             device_id=str(data["device_id"]),
@@ -313,7 +311,7 @@ class AckResult:
     OUT_OF_ORDER = "out_of_order"
     LATE = "late"
 
-    ALL: tuple[str, ...] = (NEW, DUPLICATE, OUT_OF_ORDER, LATE)
+    ALL: Tuple[str, ...] = (NEW, DUPLICATE, OUT_OF_ORDER, LATE)
 
 
 class AckTracker:
@@ -332,11 +330,11 @@ class AckTracker:
     """
 
     def __init__(self) -> None:
-        self._acks: dict[str, Ack] = {}
-        self._deadlines: dict[str, float] = {}
-        self._max_acked_seq: dict[str, int] = {}
-        self.outcomes: list[str] = []
-        self.counts: dict[str, int] = {r: 0 for r in AckResult.ALL}
+        self._acks: Dict[str, Ack] = {}
+        self._deadlines: Dict[str, float] = {}
+        self._max_acked_seq: Dict[str, int] = {}
+        self.outcomes: List[str] = []
+        self.counts: Dict[str, int] = {r: 0 for r in AckResult.ALL}
 
     def register_command(self, command: DeviceCommand) -> None:
         """命令下发时登记过期时间（供超时 ACK 判定）。"""
@@ -366,14 +364,14 @@ class AckTracker:
     def is_acked(self, command_id: str) -> bool:
         return command_id in self._acks
 
-    def ack_for(self, command_id: str) -> Ack | None:
+    def ack_for(self, command_id: str) -> Optional[Ack]:
         return self._acks.get(command_id)
 
 
 # ----------------------------------------------------------------------
 # 确定性摘要
 # ----------------------------------------------------------------------
-def payload_hash(payloads: list[dict[str, Any]]) -> str:
+def payload_hash(payloads: List[Dict[str, Any]]) -> str:
     """对一组报文做确定性 SHA-256 摘要（用于报告与重放比对）。"""
     body = json.dumps(
         payloads, ensure_ascii=False, sort_keys=True, separators=(",", ":")

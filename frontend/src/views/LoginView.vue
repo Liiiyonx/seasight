@@ -8,12 +8,12 @@
         <BrandLockup
           variant="hero"
           :size="52"
-          subtitle="SeaSight · 海洋漂浮垃圾智能治理平台"
+          subtitle="Oceanus · 海漂垃圾全链路智能治理平台"
         />
 
         <div class="login__intro">
-          <span class="login__eyebrow">DATA TO DECISION</span>
-          <h1>让每一次发现，<br />都有据可循。</h1>
+          <span class="login__eyebrow">SEE THE SEA, SAVE THE BAY</span>
+          <h1>看懂一片海，<br />护好一方湾。</h1>
           <p>连接多模态数据、领域知识与治理行动，形成可追溯的智能决策闭环。</p>
         </div>
 
@@ -32,7 +32,7 @@
         <header class="login__head">
           <span class="login__kicker">账号登录</span>
           <h2>欢迎回来</h2>
-          <p>登录后进入 SeaSight 治理平台</p>
+          <p>登录后进入 Oceanus 治理平台</p>
         </header>
 
         <form class="login__form" @submit.prevent="submit">
@@ -82,7 +82,7 @@
         <LoginDemoPanel :filled="filledUsername" @fill="fillDemo" />
       </div>
 
-      <p class="login__foot">SeaSight 智能治理平台 · 内部演示环境</p>
+      <p class="login__foot">Oceanus 智能治理平台 · 内部演示环境</p>
     </section>
   </div>
 </template>
@@ -231,7 +231,7 @@ async function fillDemo(account) {
   display: inline-block;
   margin-bottom: 18px;
   color: #7ce8f5;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 2.8px;
 }
@@ -275,7 +275,7 @@ async function fillDemo(account) {
   border-radius: 6px;
   background: rgba(3, 20, 34, 0.28);
   color: rgba(255, 255, 255, 0.42);
-  font-size: 9.5px;
+  font-size: 10.5px;
   line-height: 1.4;
   text-align: right;
 }
@@ -538,7 +538,7 @@ async function fillDemo(account) {
   .login__photo-credit {
     margin-left: auto;
     color: rgba(255, 255, 255, 0.48);
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .login__access {
@@ -575,12 +575,12 @@ async function fillDemo(account) {
   }
 
   .login__story :deep(.brand-lockup__en) {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 2px;
   }
 
   .login__story :deep(.brand-lockup__sub) {
-    font-size: 10px;
+    font-size: 10.5px;
   }
 
   .login__intro {

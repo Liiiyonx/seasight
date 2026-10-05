@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""探海灵眸 SeaSight — 端到端冒烟测试。
+"""探海灵眸 Oceanus — 端到端冒烟测试。
 
 目的：一条命令验证「事件上报 → 幂等判重 → 自动派单 → 状态流转」整条链路
 是否真的通。任何一步失败，给出明确的中文原因与排查建议。
@@ -633,7 +633,7 @@ def step_stats(api: Api, rp: Report) -> bool:
 # ======================================================================
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="探海灵眸 SeaSight 端到端冒烟测试",
+        description="探海灵眸 Oceanus 端到端冒烟测试",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"
@@ -664,7 +664,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    print(f"\n{C.BOLD}探海灵眸 SeaSight · 端到端冒烟测试{C.END}")
+    print(f"\n{C.BOLD}探海灵眸 Oceanus · 端到端冒烟测试{C.END}")
     print(f"{C.GREY}目标：{args.base_url}    时间：{datetime.now():%Y-%m-%d %H:%M:%S}{C.END}")
     print("=" * 64)
 

@@ -18,12 +18,10 @@
 不代表真实设备、真实边缘盒或现场验证。
 """
 
-from __future__ import annotations
-
 import json
 import random
-from dataclasses import dataclass, field
-from typing import Any
+from .py36_compat import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from .device import DeviceTwin, TwinConfig
 from .protocol import (
@@ -58,9 +56,9 @@ class ScenarioEvent:
 
     at: float
     kind: str
-    action: str | None = None
-    fault: str | None = None
-    params: dict[str, Any] = field(default_factory=dict)
+    action: Optional[str] = None
+    fault: Optional[str] = None
+    params: Dict[str, Any] = field(default_factory=dict)
 
 
 class DeviceScenario:
@@ -68,7 +66,7 @@ class DeviceScenario:
 
     def __init__(self, scenario_id: str = "device_scenario") -> None:
         self.scenario_id = scenario_id
-        self.events: list[ScenarioEvent] = []
+        self.events: List[ScenarioEvent] = []
 
     def cmd(self, at: float, action: str, **params: Any) -> "DeviceScenario":
         """在 ``at`` 时刻下发命令。"""
@@ -91,7 +89,7 @@ class DeviceScenario:
         self.events.append(ScenarioEvent(at=at, kind="connect"))
         return self
 
-    def sorted_events(self) -> list[ScenarioEvent]:
+    def sorted_events(self) -> List[ScenarioEvent]:
         return sorted(self.events, key=lambda e: (e.at, e.kind))
 
     def __len__(self) -> int:
@@ -104,10 +102,10 @@ class DeviceScenario:
 class FaultReport:
     """故障场景的确定性报告（可 JSON 序列化、可逐字节比对）。"""
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: Dict[str, Any]) -> None:
         self.data = data
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return self.data
 
     def to_json(self) -> str:
@@ -122,15 +120,15 @@ class FaultReport:
         return hash(self.to_json())
 
     @property
-    def recovery_rate(self) -> float | None:
+    def recovery_rate(self) -> Optional[float]:
         return self.data.get("device_fault_recovery_rate")
 
     @property
-    def ack_outcomes(self) -> dict[str, int]:
+    def ack_outcomes(self) -> Dict[str, int]:
         return self.data["ack_outcomes"]
 
     @property
-    def faults_injected(self) -> list[dict[str, Any]]:
+    def faults_injected(self) -> List[Dict[str, Any]]:
         return self.data["faults_injected"]
 
 
@@ -143,8 +141,8 @@ def run_device_scenario(
     *,
     seed: int = 42,
     start: float = 0.0,
-    end_at: float | None = None,
-    config: TwinConfig | None = None,
+    end_at: Optional[float] = None,
+    config: Optional[TwinConfig] = None,
     noise: bool = False,
 ) -> FaultReport:
     """执行场景，返回确定性 :class:`FaultReport`。
@@ -163,7 +161,7 @@ def run_device_scenario(
 
     clock = FakeClock(start)
     transport = MemoryTransport()
-    event_sink: list[dict[str, Any]] = []
+    event_sink: List[Dict[str, Any]] = []
     rng = random.Random(seed)
     modifier = (lambda tm: _jitter_telemetry(tm, rng)) if noise else None
     twin = DeviceTwin(
@@ -177,13 +175,13 @@ def run_device_scenario(
     )
 
     tracker = AckTracker()
-    telemetry_received: list[dict[str, Any]] = []
-    acks_received: list[dict[str, Any]] = []
+    telemetry_received: List[Dict[str, Any]] = []
+    acks_received: List[Dict[str, Any]] = []
 
-    def on_telemetry(topic: str, payload: dict[str, Any]) -> None:
+    def on_telemetry(topic: str, payload: Dict[str, Any]) -> None:
         telemetry_received.append(payload)
 
-    def on_ack(topic: str, payload: dict[str, Any]) -> None:
+    def on_ack(topic: str, payload: Dict[str, Any]) -> None:
         acks_received.append(payload)
         tracker.record(_ack_from_payload(payload))
 
@@ -239,7 +237,7 @@ def run_device_scenario(
     # ---- 执行：在事件时刻 tick（twin.start() 已在 start 时刻发过初始遥测）----
     idx = 0
     event_times = {e.at for e in events if e.at >= start}
-    times = sorted(event_times | {end_at})
+    times = sorted(event_times| {end_at})
     cursor = start
     steps = 0
     for t in times:
@@ -255,7 +253,7 @@ def run_device_scenario(
     twin.stop()
 
     # ---- 遥测故障观测 ----
-    fault_observations: dict[str, dict[str, Any]] = {}
+    fault_observations: Dict[str, Dict[str, Any]] = {}
     detected_total = 0
     for tm in telemetry_received:
         code = tm["fault_code"]
@@ -268,7 +266,7 @@ def run_device_scenario(
         obs["last_seen"] = tm["timestamp"]
 
     # ---- 注入故障生命周期 ----
-    faults_injected: list[dict[str, Any]] = []
+    faults_injected: List[Dict[str, Any]] = []
     recovered = 0
     for code, lc in twin._fault_lifecycle.items():
         injected_at = lc.get("injected_at")
@@ -304,7 +302,7 @@ def run_device_scenario(
             ]
         )
 
-    data: dict[str, Any] = {
+    data: Dict[str, Any] = {
         "scenario_id": scenario.scenario_id,
         "device_id": device_id,
         "seed": seed,
@@ -333,7 +331,7 @@ def run_device_scenario(
     return FaultReport(data)
 
 
-def _ack_from_payload(payload: dict[str, Any]) -> Any:
+def _ack_from_payload(payload: Dict[str, Any]) -> Any:
     """把 ACK 报文 dict 转回 Ack 对象（复用 Ack.from_dict）。"""
     from .protocol import Ack
 

@@ -1,4 +1,4 @@
-"""探海灵眸 SeaSight — 应用配置。
+"""探海灵眸 Oceanus — 应用配置。
 
 所有配置从环境变量读取（支持 .env 文件），集中在此处管理。
 """
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # ---------- 应用 ----------
-    app_name: str = "SeaSight"
+    app_name: str = "Oceanus"
     app_env: Literal["development", "staging", "production"] = "development"
     debug: bool = True
     api_v1_prefix: str = "/api/v1"
@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Shanghai"
 
     # ---------- 数据库 ----------
+    # ★ 品牌显示名已改为 Oceanus，但这三个值**刻意保留 seasight**：
+    #   它们对应 ECS 上已建好的数据库与账号，改名会导致服务连不上库。
+    #   要改名需同步：ALTER DATABASE / docker-compose 环境变量 /
+    #   重建容器，三处一起动，缺一处就断。详见 docs/competitions/
+    #   arm-hardware-probe-2026-10-05.md 同批说明。
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "seasight"
@@ -65,6 +70,8 @@ class Settings(BaseSettings):
         return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     # ---------- MQTT ----------
+    # ★ 同上：账号/密码/client_id 对应 broker 上已创建的凭据，刻意保留
+    #   seasight。改client_id 还可能被 broker 当成重复登录踢下线。
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
     mqtt_username: str = "seasight"

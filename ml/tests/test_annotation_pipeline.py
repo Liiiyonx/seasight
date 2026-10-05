@@ -1,10 +1,10 @@
-"""SeaSight 感知数据标注转换与完整性校验测试（WP-13）。
+"""Oceanus 感知数据标注转换与完整性校验测试（WP-13）。
 
 覆盖冻结接口：
-  - SeaSight COCO-like JSON 结构（12 个顶层字段、schema_version、标注必填字段）
+  - Oceanus COCO-like JSON 结构（12 个顶层字段、schema_version、标注必填字段）
   - 图片路径 / 类别 / bbox / 面积 / 重复 ID / 跨 split 泄漏 / 校验和
   - 证据等级纪律：合成最高 E2；real 需真实来源+复核；E4 不自动授予
-  - YOLO txt ↔ SeaSight JSON 双向转换
+  - YOLO txt ↔ Oceanus JSON 双向转换
   - 报告字段：输入文件哈希、样本数、类别分布、跳过的坏样本、evidence_level
 
 全部离线：图片由 Pillow 内存生成到临时目录，不访问公网、不调用模型。
@@ -306,7 +306,7 @@ def test_empty_planned_dataset_is_valid_but_not_evaluated(tmp_path) -> None:
 
 
 # ----------------------------------------------------------------------
-# YOLO ↔ SeaSight 转换
+# YOLO ↔ Oceanus 转换
 # ----------------------------------------------------------------------
 
 def test_yolo_to_seasight_import(tmp_path: Path) -> None:
@@ -429,7 +429,7 @@ def test_seasight_to_yolo_skips_bad_annotations(tmp_path: Path) -> None:
 
 
 def test_yolo_roundtrip_preserves_annotations(tmp_path: Path) -> None:
-    """SeaSight → YOLO → SeaSight：标注数量与类别分布保持一致。"""
+    """Oceanus → YOLO → Oceanus：标注数量与类别分布保持一致。"""
     root, ds = valid_dataset(tmp_path)
     yolo_out = tmp_path / "yolo_out"
     ca.seasight_to_yolo(ds, root, yolo_out)

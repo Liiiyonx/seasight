@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Skill template lightweight migration validation (E1 demo).
 
-Runs the same deterministic SeaSight knowledge pipeline (asset ingestion ->
+Runs the same deterministic Oceanus knowledge pipeline (asset ingestion ->
 candidate extraction -> co-occurrence relations -> cross-document retrieval)
 over three industry demo corpora: marine governance, medical insurance, and
 government service. The five Nexent SKILL.md workflow templates are reused

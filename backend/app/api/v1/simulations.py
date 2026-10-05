@@ -236,6 +236,10 @@ def _track_out(track: Track, seq: int) -> dict[str, Any] | None:
             "mixed": float(track.bin_mixed or 0),
         },
         "speed": float(track.speed) if track.speed is not None else None,
+        # 逐舵机遥测（电压/温度/位置），真机执行时才有值。
+        # ★ 由驱动从舵机回读，是"机械臂真的动了"的硬证据；
+        #   而上面的 status / battery 是平台侧自报。仿真时为 None。
+        "servo_telemetry": track.servo_telemetry or None,
     }
 
 

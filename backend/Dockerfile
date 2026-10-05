@@ -1,4 +1,4 @@
-# 探海灵眸 SeaSight — 后端镜像
+# 探海灵眸 Oceanus — 后端镜像
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \

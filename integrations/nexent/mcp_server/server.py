@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SeaSight MCP server for Nexent.
+"""Oceanus MCP server for Nexent.
 
 This process supports both stdio and remote HTTP transports. It never imports
-the SeaSight database models or opens an application session. All reads and
+the Oceanus database models or opens an application session. All reads and
 writes go through the public FastAPI contract and therefore retain the
 backend's authentication, role checks, township scope, audit trail, and
 idempotency behavior.
@@ -69,8 +69,8 @@ MCP_PUBLIC_URL = os.getenv(
 HTTP_TRANSPORTS = {"sse", "streamable-http"}
 
 
-class SeaSightAPIError(RuntimeError):
-    """A structured error returned by the SeaSight HTTP API."""
+class OceanusAPIError(RuntimeError):
+    """A structured error returned by the Oceanus HTTP API."""
 
     def __init__(
         self,
@@ -86,8 +86,8 @@ class SeaSightAPIError(RuntimeError):
         self.http_status = http_status
 
 
-class SeaSightTokenProvider:
-    """Resolve, cache and refresh the outbound SeaSight access token."""
+class OceanusTokenProvider:
+    """Resolve, cache and refresh the outbound Oceanus access token."""
 
     def __init__(
         self,
@@ -175,27 +175,27 @@ class SeaSightTokenProvider:
                 follow_redirects=True,
             )
         except httpx.HTTPError as exc:
-            raise SeaSightAPIError(
-                f"SeaSight login request failed: {exc}"
+            raise OceanusAPIError(
+                f"Oceanus login request failed: {exc}"
             ) from exc
 
         try:
             payload = response.json()
         except ValueError as exc:
-            raise SeaSightAPIError(
-                f"SeaSight login returned non-JSON response "
+            raise OceanusAPIError(
+                f"Oceanus login returned non-JSON response "
                 f"(HTTP {response.status_code})",
                 http_status=response.status_code,
             ) from exc
 
         if not isinstance(payload, dict) or "code" not in payload:
-            raise SeaSightAPIError(
-                "SeaSight login response is not an ApiResponse envelope",
+            raise OceanusAPIError(
+                "Oceanus login response is not an ApiResponse envelope",
                 http_status=response.status_code,
             )
         if response.status_code >= 400 or payload.get("code") != 0:
-            raise SeaSightAPIError(
-                f"SeaSight login failed (HTTP {response.status_code}): "
+            raise OceanusAPIError(
+                f"Oceanus login failed (HTTP {response.status_code}): "
                 f"[{payload.get('code')}] "
                 f"{payload.get('message') or 'authentication error'}",
                 code=payload.get("code")
@@ -207,14 +207,14 @@ class SeaSightTokenProvider:
 
         data = payload.get("data")
         if not isinstance(data, dict):
-            raise SeaSightAPIError(
-                "SeaSight login response did not contain token data",
+            raise OceanusAPIError(
+                "Oceanus login response did not contain token data",
                 http_status=response.status_code,
             )
         token = str(data.get("access_token") or "").strip()
         if not token:
-            raise SeaSightAPIError(
-                "SeaSight login response did not contain access_token",
+            raise OceanusAPIError(
+                "Oceanus login response did not contain access_token",
                 http_status=response.status_code,
             )
 
@@ -233,7 +233,7 @@ class SeaSightTokenProvider:
         return token
 
 
-token_provider = SeaSightTokenProvider(
+token_provider = OceanusTokenProvider(
     base_url=API_BASE_URL,
     static_token=API_TOKEN,
     username=API_USERNAME,
@@ -254,7 +254,7 @@ def _call(
     params: Optional[dict[str, Any]] = None,
     body: Optional[dict[str, Any]] = None,
 ) -> Any:
-    """Call SeaSight and unwrap the ``ApiResponse`` envelope.
+    """Call Oceanus and unwrap the ``ApiResponse`` envelope.
 
     ``code != 0`` is always an error. Returning the envelope as data would let
     an agent silently treat a permission or not-found response as success.
@@ -282,26 +282,26 @@ def _call(
                     headers=token_provider.headers(force_refresh=True),
                 )
     except httpx.HTTPError as exc:
-        raise SeaSightAPIError(f"SeaSight HTTP request failed: {exc}") from exc
+        raise OceanusAPIError(f"Oceanus HTTP request failed: {exc}") from exc
 
     try:
         payload = response.json()
     except ValueError as exc:
-        raise SeaSightAPIError(
-            f"SeaSight returned non-JSON response (HTTP {response.status_code})",
+        raise OceanusAPIError(
+            f"Oceanus returned non-JSON response (HTTP {response.status_code})",
             http_status=response.status_code,
         ) from exc
 
     if not isinstance(payload, dict) or "code" not in payload:
-        raise SeaSightAPIError(
-            "SeaSight response is not an ApiResponse envelope",
+        raise OceanusAPIError(
+            "Oceanus response is not an ApiResponse envelope",
             http_status=response.status_code,
         )
 
     code = payload.get("code")
     if code != 0:
-        message = str(payload.get("message") or "SeaSight business error")
-        raise SeaSightAPIError(
+        message = str(payload.get("message") or "Oceanus business error")
+        raise OceanusAPIError(
             f"[{code}] {message}",
             code=code if isinstance(code, int) else None,
             trace_id=payload.get("trace_id"),
@@ -309,8 +309,8 @@ def _call(
         )
 
     if response.status_code >= 400:
-        raise SeaSightAPIError(
-            f"SeaSight returned HTTP {response.status_code}",
+        raise OceanusAPIError(
+            f"Oceanus returned HTTP {response.status_code}",
             trace_id=payload.get("trace_id"),
             http_status=response.status_code,
         )
@@ -319,8 +319,8 @@ def _call(
 
 def _require_writes_enabled() -> None:
     if not ALLOW_WRITES:
-        raise SeaSightAPIError(
-            "SeaSight MCP writes are disabled; set "
+        raise OceanusAPIError(
+            "Oceanus MCP writes are disabled; set "
             "SEASIGHT_MCP_ALLOW_WRITES=true to register write tools"
         )
 
@@ -354,7 +354,7 @@ if TRANSPORT in HTTP_TRANSPORTS and MCP_SERVER_TOKEN:
 
 
 mcp = FastMCP(
-    "SeaSight Domain Cognition MCP",
+    "Oceanus Domain Cognition MCP",
     host=MCP_HOST,
     port=MCP_PORT,
     streamable_http_path="/mcp",
@@ -576,7 +576,7 @@ def dashboard_get() -> dict[str, Any]:
 
 @mcp.tool()
 def agent_runtime_status() -> dict[str, Any]:
-    """Read the current SeaSight agent runtime state and tool count."""
+    """Read the current Oceanus agent runtime state and tool count."""
 
     return _call("GET", "/agents/runtime/status")
 
@@ -930,7 +930,7 @@ def _check_payload() -> dict[str, Any]:
     registered_tools = sorted(tool.name for tool in anyio.run(mcp.list_tools))
     errors = _configuration_errors()
     return {
-        "name": "SeaSight Domain Cognition MCP",
+        "name": "Oceanus Domain Cognition MCP",
         "valid": not errors,
         "configuration_errors": errors,
         "api_base_url": API_BASE_URL,
@@ -954,7 +954,7 @@ def _check_payload() -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SeaSight MCP server for Nexent")
+    parser = argparse.ArgumentParser(description="Oceanus MCP server for Nexent")
     parser.add_argument(
         "--check",
         action="store_true",

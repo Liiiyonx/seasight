@@ -61,7 +61,7 @@
           >
             <div class="feed__head">
               <span class="feed__class">
-                <i class="dot" :style="{ background: classColor(evt.main_class) }"></i>
+                <i class="dot" :class="'dot-' + evt.main_class"></i>
                 {{ classLabel(evt.main_class) }}
               </span>
               <span class="feed__time">{{ fmtRelative(evt.event_time) }}</span>
@@ -147,10 +147,10 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { statsApi, agentsApi } from '@/api'
 import {
   classLabel,
-  classColor,
   CLASS_ORDER,
   WASTE_CLASSES,
 } from '@/utils/constants'
+import { palette, classThemeColor } from '@/utils/palette'
 import { fmtRelative, fmtConfidence, fmtUsage, batteryColor } from '@/utils/format'
 
 const store = useRealtimeStore()
@@ -262,69 +262,75 @@ async function loadCharts() {
   }
 }
 
-const trendOption = computed(() => ({
-  grid: { left: 42, right: 14, top: 20, bottom: 26 },
-  tooltip: { trigger: 'axis' },
-  xAxis: {
-    type: 'category',
-    data: trend.value.map((d) => {
-      const dt = new Date(d.time)
-      return `${String(dt.getHours()).padStart(2, '0')}:00`
-    }),
-    axisLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.32)' } },
-    axisLabel: { color: '#8b96a8', fontSize: 11 },
-  },
-  yAxis: {
-    type: 'value',
-    splitLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.18)' } },
-    axisLabel: { color: '#8b96a8', fontSize: 11 },
-  },
-  series: [
-    {
-      type: 'line',
-      smooth: true,
-      symbol: 'none',
-      data: trend.value.map((d) => d.count),
-      lineStyle: {
-        width: 2,
-        color: '#007aff',
-      },
-      areaStyle: {
-        color: 'rgba(0, 122, 255, 0.14)',
-      },
+const trendOption = computed(() => {
+  const p = palette()
+  return {
+    grid: { left: 42, right: 14, top: 20, bottom: 26 },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: trend.value.map((d) => {
+        const dt = new Date(d.time)
+        return `${String(dt.getHours()).padStart(2, '0')}:00`
+      }),
+      axisLine: { lineStyle: { color: p.axisLine } },
+      axisLabel: { color: p.axisLabel, fontSize: 11 },
     },
-  ],
-}))
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: p.splitLine } },
+      axisLabel: { color: p.axisLabel, fontSize: 11 },
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        data: trend.value.map((d) => d.count),
+        lineStyle: {
+          width: 2,
+          color: p.primary,
+        },
+        areaStyle: {
+          color: p.primaryGlow,
+        },
+      },
+    ],
+  }
+})
 
-const classOption = computed(() => ({
-  tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' },
-  legend: {
-    orient: 'vertical',
-    right: 6,
-    top: 'center',
-    textStyle: { color: '#8b96a8', fontSize: 11 },
-    itemWidth: 9,
-    itemHeight: 9,
-  },
-  series: [
-    {
-      type: 'pie',
-      radius: ['48%', '72%'],
-      center: ['36%', '50%'],
-      avoidLabelOverlap: true,
-      itemStyle: { borderColor: 'rgba(142, 142, 147, 0.2)', borderWidth: 1 },
-      label: { show: false },
-      data: CLASS_ORDER.map((k) => {
-        const found = classes.value.find((c) => c.main_class === k)
-        return {
-          name: WASTE_CLASSES[k].label,
-          value: found?.count || 0,
-          itemStyle: { color: WASTE_CLASSES[k].color },
-        }
-      }).filter((d) => d.value > 0),
+const classOption = computed(() => {
+  const p = palette()
+  return {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' },
+    legend: {
+      orient: 'vertical',
+      right: 6,
+      top: 'center',
+      textStyle: { color: p.axisLabel, fontSize: 11 },
+      itemWidth: 9,
+      itemHeight: 9,
     },
-  ],
-}))
+    series: [
+      {
+        type: 'pie',
+        radius: ['48%', '72%'],
+        center: ['36%', '50%'],
+        avoidLabelOverlap: true,
+        itemStyle: { borderColor: p.pieBorder, borderWidth: 1 },
+        label: { show: false },
+        data: CLASS_ORDER.map((k) => {
+          const found = classes.value.find((c) => c.main_class === k)
+          return {
+            name: WASTE_CLASSES[k].label,
+            value: found?.count || 0,
+            itemStyle: { color: classThemeColor(k) },
+          }
+        }).filter((d) => d.value > 0),
+      },
+    ],
+  }
+})
 
 // ---------- 定时 ----------
 let chartTimer = null
@@ -433,7 +439,7 @@ onUnmounted(() => {
 
 .feed__item--new {
   border-left-color: var(--c-warn);
-  background: rgba(255, 149, 0, 0.1);
+  background: color-mix(in srgb, var(--c-warn) 10%, transparent);
 }
 
 .feed__head {

@@ -45,6 +45,15 @@ HARD_MARKERS = (
     ".".join(("8", "153", "151", "13")),
 )
 
+# ★ 扫描器自身豁免名单（2026-10-05 补）
+#   这三个文件定义了用于检出本机路径/生产地址的正则，源码里必然
+#   出现这些模式的字面量 → 扫描自己会永远命中，门禁无法通过。
+SCANNER_SELF = frozenset({
+    "scripts/check_public_repo_privacy.py",
+    "scripts/build_public_release.py",
+    "scripts/precommit_scan.py",
+})
+
 # 命中即视为“验收/工作日志类敏感产物，公开前需脱敏或排除”。
 SENSITIVE_PARTS = (
     "artifacts/harness_dispatch/",
@@ -147,7 +156,12 @@ def main(argv: list[str] | None = None) -> int:
     notices: list[str] = []
 
     for rel in files:
-        if rel == "scripts/check_public_repo_privacy.py":
+        # ★ 扫描器自身豁免（2026-10-05 补）
+        #   这三个文件**定义**了用于检出本机路径/生产地址的正则，
+        #   源码里必然出现这些模式的字面量。只豁免自己一个时，
+        #   另外两个扫描器会互相被判为"含本机路径"，门禁永远过不了。
+        #   豁免是安全的：它们的命中是模式定义，不是真实泄露。
+        if rel in SCANNER_SELF:
             continue
         path_hits, notice_hits = scan_file(rel, root)
         if path_hits:

@@ -1,7 +1,7 @@
-# SeaSight Nexent Integration
+# Oceanus Nexent Integration
 
-This directory connects SeaSight to Huawei ModelEngine Nexent through MCP and
-reusable Skills. It does not replace the SeaSight backend and does not import
+This directory connects Oceanus to Huawei ModelEngine Nexent through MCP and
+reusable Skills. It does not replace the Oceanus backend and does not import
 backend database code. The MCP process supports local `stdio` and remote
 Streamable HTTP/SSE transports, and always calls the public `/api/v1` contract.
 
@@ -10,10 +10,10 @@ Streamable HTTP/SSE transports, and always calls the public `/api/v1` contract.
 ```text
 Nexent Agent
   ├── Skills: business workflows and evidence discipline
-  └── MCP: SeaSight Domain Cognition MCP
+  └── MCP: Oceanus Domain Cognition MCP
           │  Bearer token + ApiResponse handling
           ▼
-SeaSight FastAPI /api/v1
+Oceanus FastAPI /api/v1
   ├── knowledge assets, ontology, multi-hop search, decisions
   ├── events and work orders
   └── Agent runtime, tools, approvals, audit mirror
@@ -52,7 +52,7 @@ There are two independent Bearer tokens:
 
 | Variable | Direction | Purpose |
 | --- | --- | --- |
-| `SEASIGHT_API_TOKEN` or username/password | MCP to SeaSight | Outbound calls to `/api/v1` |
+| `SEASIGHT_API_TOKEN` or username/password | MCP to Oceanus | Outbound calls to `/api/v1` |
 | `SEASIGHT_MCP_SERVER_TOKEN` | Nexent to MCP | Inbound authentication for HTTP transports |
 
 Do not reuse the two secrets. HTTP transports refuse to start unless the
@@ -99,7 +99,7 @@ make nexent-acceptance
 This starts an isolated Streamable HTTP server, verifies fail-closed inbound
 authentication, initializes an MCP client, lists the 32 tools, validates the
 five Skill front matters, and verifies outbound token refresh against a mock
-SeaSight API. Add `--live-api` to `scripts/nexent_acceptance.py` to call
+Oceanus API. Add `--live-api` to `scripts/nexent_acceptance.py` to call
 `knowledge_list_assets` against a running backend.
 
 ## Production Container

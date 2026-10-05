@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 模型导出脚本（ONNX / TensorRT / RKNN）。
+"""探海灵眸 Oceanus — 模型导出脚本（ONNX / TensorRT / RKNN）。
 
 ★ 这段代码里最重要的一件事：**RK3588 不能用官方 ultralytics 导出**
 ──────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ def main() -> int:
     args = parse_args()
 
     print("=" * 66)
-    print("  探海灵眸 SeaSight — 模型导出")
+    print("  探海灵眸 Oceanus — 模型导出")
     print("=" * 66)
 
     # ---------- 只做验证 ----------

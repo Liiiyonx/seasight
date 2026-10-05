@@ -131,6 +131,7 @@ import ChartPanel from '@/components/ChartPanel.vue'
 import { reportsApi, downloadBlob } from '@/api'
 import { useRealtimeStore } from '@/stores/realtime'
 import { classLabel, classColor, WASTE_CLASSES, CLASS_ORDER } from '@/utils/constants'
+import { palette, classThemeColor } from '@/utils/palette'
 import { fmtNumber } from '@/utils/format'
 
 const store = useRealtimeStore()
@@ -162,6 +163,7 @@ function completion(row) {
 }
 
 const townshipOption = computed(() => {
+  const p = palette()
   const names = summary.value.map((s) => s.township)
   return {
     grid: { left: 78, right: 20, top: 26, bottom: 24 },
@@ -170,34 +172,34 @@ const townshipOption = computed(() => {
       data: ['发现事件', '完成工单'],
       right: 10,
       top: 0,
-      textStyle: { color: '#8b96a8', fontSize: 11 },
+      textStyle: { color: p.axisLabel, fontSize: 11 },
       itemWidth: 10,
       itemHeight: 10,
     },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.18)' } },
-      axisLabel: { color: '#8b96a8', fontSize: 11 },
+      splitLine: { lineStyle: { color: p.splitLine } },
+      axisLabel: { color: p.axisLabel, fontSize: 11 },
     },
     yAxis: {
       type: 'category',
       data: names,
-      axisLine: { lineStyle: { color: 'rgba(142, 142, 147, 0.32)' } },
-      axisLabel: { color: '#8b96a8', fontSize: 11 },
+      axisLine: { lineStyle: { color: p.axisLine } },
+      axisLabel: { color: p.axisLabel, fontSize: 11 },
     },
     series: [
       {
         name: '发现事件',
         type: 'bar',
         data: summary.value.map((s) => s.event_count),
-        itemStyle: { color: '#ff9500', borderRadius: [0, 3, 3, 0] },
+        itemStyle: { color: p.warn, borderRadius: [0, 3, 3, 0] },
         barWidth: 9,
       },
       {
         name: '完成工单',
         type: 'bar',
         data: summary.value.map((s) => s.done_count),
-        itemStyle: { color: '#007aff', borderRadius: [0, 3, 3, 0] },
+        itemStyle: { color: p.primary, borderRadius: [0, 3, 3, 0] },
         barWidth: 9,
       },
     ],
@@ -205,6 +207,7 @@ const townshipOption = computed(() => {
 })
 
 const classOption = computed(() => {
+  const p = palette()
   // 按类别聚合明细行
   const agg = {}
   for (const r of rows.value) {
@@ -216,7 +219,7 @@ const classOption = computed(() => {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' },
     legend: {
       bottom: 0,
-      textStyle: { color: '#8b96a8', fontSize: 11 },
+      textStyle: { color: p.axisLabel, fontSize: 11 },
       itemWidth: 9,
       itemHeight: 9,
     },
@@ -225,16 +228,16 @@ const classOption = computed(() => {
         type: 'pie',
         radius: ['42%', '68%'],
         center: ['50%', '44%'],
-        itemStyle: { borderColor: 'rgba(142, 142, 147, 0.2)', borderWidth: 1 },
+        itemStyle: { borderColor: p.pieBorder, borderWidth: 1 },
         label: {
-          color: '#8b96a8',
+          color: p.axisLabel,
           fontSize: 11,
           formatter: '{b}\n{c}',
         },
         data: CLASS_ORDER.map((k) => ({
           name: WASTE_CLASSES[k].label,
           value: agg[k] || 0,
-          itemStyle: { color: WASTE_CLASSES[k].color },
+          itemStyle: { color: classThemeColor(k) },
         })).filter((d) => d.value > 0),
       },
     ],

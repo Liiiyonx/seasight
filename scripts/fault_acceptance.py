@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SeaSight WP-17 受控故障演练包（E1，一键复现既有确定性用例）。
+"""Oceanus WP-17 受控故障演练包（E1，一键复现既有确定性用例）。
 
 不是新的「真实故障」证据，而是把已实现的确定性恢复/降级用例做成
 可一键复现的 E1 证据包：用 subprocess 逐组调用 pytest，并用
@@ -255,7 +255,7 @@ def main() -> int:
 
     groups = []
     print("=" * 72)
-    print("SeaSight WP-17 受控故障演练（E1）—— 逐组复跑确定性降级/恢复用例")
+    print("Oceanus WP-17 受控故障演练（E1）—— 逐组复跑确定性降级/恢复用例")
     print(f"runner python: {python}")
     print("=" * 72)
 

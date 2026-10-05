@@ -1,4 +1,4 @@
-"""探海灵眸 SeaSight — 后端应用入口。
+"""探海灵眸 Oceanus — 后端应用入口。
 
 启动流程（lifespan）：
     1. 初始化日志
@@ -224,9 +224,9 @@ def create_app() -> FastAPI:
     """创建 FastAPI 应用。"""
     docs_enabled = settings.app_env != "production"
     app = FastAPI(
-        title="探海灵眸 SeaSight API",
+        title="探海灵眸 Oceanus API",
         description=(
-            "海漂垃圾「感知—决策—执行」一体化智能治理系统 · 后端接口\n\n"
+            "海漂垃圾「感知—决策—执行」全链路智能治理系统 · 后端接口\n\n"
             "**平台是中枢，不是显示屏** —— 识别到垃圾不是弹框，"
             "而是产生事件 → 触发派单 → 形成可追溯工单。"
         ),

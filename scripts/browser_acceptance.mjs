@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SeaSight WP-17 集成浏览器验收（E1）
+ * Oceanus WP-17 集成浏览器验收（E1）
  * =====================================================================
  * 把原先「仅 Agent 页面 + API 拦截构造状态」的浏览器回归升级为
  * 「真实登录 + 主业务链路」的集成验收包：
@@ -521,7 +521,7 @@ async function acceptance() {
       // 稳定业务标识：路由根节点 + 文档标题
       await page.locator(cfg.root).first().waitFor({ state: 'visible', timeout: 15000 })
       const pageTitle = await page.title()
-      assert.match(pageTitle, new RegExp(cfg.title), `页面标题应为「${cfg.title}·探海灵眸 SeaSight」`)
+      assert.match(pageTitle, new RegExp(cfg.title), `页面标题应为「${cfg.title}·探海灵眸 Oceanus」`)
       // 关键 API 无 4xx/5xx
       const bad = Object.entries(keyApiStatus).filter(([, s]) => s < 200 || s >= 300)
       assert.deepEqual(bad, [], `关键 API 出现非 2xx: ${JSON.stringify(keyApiStatus)}`)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — OpenCV 感知评测脚本（WP-06）。
+"""探海灵眸 Oceanus — OpenCV 感知评测脚本（WP-06）。
 
 把「OpenCV 检测结果 + 时序校验 + 数据集隔离」变成可复现实验：
 
@@ -722,7 +722,7 @@ def _code_version(config_path: Path, manifest_dir: Path) -> dict[str, Any]:
 
 
 def _load_protocol_gt(path: Path) -> tuple[dict[str, dict[str, Any]] | None, str]:
-    """加载并校验 WP-13 数据协议 JSON（SeaSight COCO-like），返回 GT 映射。
+    """加载并校验 WP-13 数据协议 JSON（Oceanus COCO-like），返回 GT 映射。
 
     返回 (gt_map, reason)：gt_map = {图片文件名: {"objects": [{class, bbox}]}}，
     bbox 已由 COCO xywh 转为 [x1, y1, x2, y2]；类别按 categories.id→name 映射。
@@ -886,7 +886,7 @@ def build_report(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="探海灵眸 SeaSight — OpenCV 感知评测（WP-06）",
+        description="探海灵眸 Oceanus — OpenCV 感知评测（WP-06）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "退出码：0=完成（含空数据 not_evaluated）；1=运行时错误；2=配置/清单错误；3=依赖缺失\n"
@@ -911,7 +911,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--gt-json",
         default=None,
         metavar="DATASET_JSON",
-        help="WP-13 数据协议 JSON（SeaSight COCO-like）：提供时地面真值取自协议 JSON "
+        help="WP-13 数据协议 JSON（Oceanus COCO-like）：提供时地面真值取自协议 JSON "
              "（经协议校验：跳过坏样本、拒绝越级证据、检测泄漏），而非 manifest 标签；"
              "协议无效/越级证据/空数据 → not_evaluated，绝不生成虚假精度",
     )

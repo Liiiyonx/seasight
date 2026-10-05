@@ -78,7 +78,7 @@ from app.services.agents.repositories import (
 from app.services.agents.schema import sha256_hex
 from app.services.agents.tools import ToolDefinition, ToolExecutor, ToolRegistry, ToolResult
 
-logger = logging.getLogger("seasight.agents")
+logger = logging.getLogger("oceanus.agents")
 
 # ----------------------------------------------------------------------
 # 时钟与 ID 工厂（可注入，测试可确定复现）

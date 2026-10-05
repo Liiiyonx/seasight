@@ -5,50 +5,82 @@ the platform MQTT contract stay unchanged when hardware changes.
 
 Evidence level: E1/E2. Simulated and generic HTTP drivers are deterministic
 prototype adapters; they do not prove physical pickup or field acceptance.
+
+Python 3.6 note
+---------------
+本文件要能在树莓派（ArmPi FPV 出厂镜像，**Python 3.6.9**）上直接 import，
+所以：
+
+* **不写** ``from __future__ import annotations``（3.6 不支持）
+* 类型注解一律用 ``Dict[...]``/``Optional[...]``，**不用** ``Dict[...]``
+  这种下标泛型（3.6 定义时求值即失败）
+* ``dataclass`` / ``Protocol`` 从 :mod:`arm_bridge.py36_compat` 取
 """
 
-from __future__ import annotations
-
+import importlib
 import json
+import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from device_sim.protocol import DeviceMode, Position
+
+# ★ 3.6 兼容：从 py36_compat 取，而不是标准库
+from .py36_compat import (
+    DictStrAny,
+    DictStrFloat,
+    OptStr,
+    Protocol,
+    field,
+    make_dataclass,
+)
+
+_BINS_DEFAULT = field(
+    default_factory=lambda: {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
+)
 
 
 class DriverError(RuntimeError):
     """Raised when the underlying arm SDK rejects or fails an action."""
 
 
-@dataclass(frozen=True)
-class PickResult:
-    """Outcome of one pickup action, translated to the platform contract."""
+# ★ 原来用 @dataclass(frozen=True) class 语法，但 3.6 的 __annotations__
+#   是普通 dict、不保证字段顺序，而本项目的构造调用有位置参数
+#   （页面与 MQTT 出口都在按序传），所以改成显式列出字段顺序 ——
+#   行为等价，顺序确定。
+PickResult = make_dataclass(
+    "PickResult",
+    [
+        ("ok", True),
+        ("collected_weight", 0.0),
+        ("review_result", "confirmed"),
+        ("evidence_url", None),
+        ("bins_after", _BINS_DEFAULT),
+    ],
+    doc="Outcome of one pickup action, translated to the platform contract.",
+)
 
-    ok: bool = True
-    collected_weight: float = 0.0
-    review_result: str = "confirmed"
-    evidence_url: str | None = None
-    bins_after: dict[str, float] = field(
-        default_factory=lambda: {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
-    )
-
-
-@dataclass(frozen=True)
-class ArmStatus:
-    """Current status snapshot reported as marine telemetry."""
-
-    mode: str = DeviceMode.IDLE
-    battery: int = 100
-    bins: dict[str, float] = field(
-        default_factory=lambda: {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
-    )
-    location: Position = Position(119.6540, 26.3870)
-    heading: float = 0.0
-    speed: float = 0.0
+#: Current status snapshot reported as marine telemetry.
+#:
+#: ``servos`` 是逐舵机遥测（电压/温度/位置）—— ★ 证据链价值：
+#: 这些数字来自舵机本身，是"机械臂真的动了"的硬证据，
+#: 比 progress 报文自报更有说服力。None 表示该次读取失败。
+ArmStatus = make_dataclass(
+    "ArmStatus",
+    [
+        ("mode", DeviceMode.IDLE),
+        ("battery", 100),
+        ("bins", _BINS_DEFAULT),
+        ("location", Position(119.6540, 26.3870)),
+        ("heading", 0.0),
+        ("speed", 0.0),
+        ("servos", field(default_factory=dict)),
+    ],
+    doc="Current status snapshot reported as marine telemetry.",
+)
 
 
 class ArmDriver(Protocol):
@@ -71,9 +103,14 @@ class ArmDriver(Protocol):
     def emergency_stop(self) -> None: ...
 
 
+#: 需要额外运行时依赖的驱动 -> 模块路径。惰性加载，见 build_arm_driver。
+_OPTIONAL_DRIVER_MODULES = {
+    "ros_arm_control": "arm_bridge.ros_driver",
+}
+
 ArmDriverFactory = Callable[..., Any]
 
-ARM_DRIVER_REGISTRY: dict[str, ArmDriverFactory] = {}
+ARM_DRIVER_REGISTRY: Dict[str, ArmDriverFactory] = {}
 
 
 def register_arm_driver(name: str, factory: ArmDriverFactory) -> None:
@@ -85,8 +122,8 @@ def register_arm_driver(name: str, factory: ArmDriverFactory) -> None:
 
 
 def build_arm_driver(
-    driver_cfg: dict[str, Any],
-    backend: str | None = None,
+    driver_cfg: Dict[str, Any],
+    backend: Optional[str] = None,
 ) -> Any:
     """Build a driver from the ``driver`` config section.
 
@@ -99,6 +136,21 @@ def build_arm_driver(
       class selected by ``kind``
     """
     effective_backend = str(backend or driver_cfg.get("backend", "simulated"))
+
+    # ★ 可选驱动惰性加载：ros_driver 只在真正选用它时才 import。
+    #   原因：它 import rospy，而 rospy 只在树莓派上有；开发机与 CI 上
+    #   import 会失败。同时它靠 import 副作用把自己注册进本表，
+    #   不import 就查不到 —— 所以在查表**之前**先尝试加载。
+    if effective_backend in _OPTIONAL_DRIVER_MODULES:
+        mod = _OPTIONAL_DRIVER_MODULES[effective_backend]
+        if mod not in sys.modules:
+            try:
+                importlib.import_module(mod)
+            except ImportError as exc:  # pragma: no cover - 取决于环境
+                raise DriverError(
+                    f"arm driver {effective_backend!r} requires module {mod!r}: {exc}"
+                ) from exc
+
     vendors = driver_cfg.get("vendors")
     if isinstance(vendors, dict) and effective_backend in vendors:
         vendor = vendors[effective_backend]
@@ -136,13 +188,13 @@ class SimulatedArmDriver:
     def __init__(
         self,
         battery: int = 100,
-        bins: dict[str, float] | None = None,
-        home: dict[str, float] | None = None,
+        bins: Optional[Dict[str, float]] = None,
+        home: Optional[Dict[str, float]] = None,
         collected_weight: float = 0.05,
         review_result: str = "confirmed",
     ) -> None:
         self.battery = int(battery)
-        self.bins: dict[str, float] = dict(
+        self.bins: Dict[str, float] = dict(
             bins or {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
         )
         home = home or {"lng": 119.6540, "lat": 26.3870}
@@ -200,10 +252,10 @@ class HttpArmDriver:
         endpoint: str,
         method: str = "POST",
         timeout: float = 10.0,
-        headers: dict[str, str] | None = None,
+        headers: Optional[Dict[str, str]] = None,
         battery: int = 100,
-        bins: dict[str, float] | None = None,
-        home: dict[str, float] | None = None,
+        bins: Optional[Dict[str, float]] = None,
+        home: Optional[Dict[str, float]] = None,
     ) -> None:
         self.endpoint = str(endpoint).rstrip("/")
         self.method = str(method).upper()
@@ -211,7 +263,7 @@ class HttpArmDriver:
         self.headers = {"Content-Type": "application/json"}
         self.headers.update(headers or {})
         self.battery = int(battery)
-        self.bins: dict[str, float] = dict(
+        self.bins: Dict[str, float] = dict(
             bins or {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
         )
         home = home or {"lng": 119.6540, "lat": 26.3870}
@@ -226,7 +278,7 @@ class HttpArmDriver:
             location=self.home,
         )
 
-    def _call(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _call(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             self.endpoint, data=body, method=self.method, headers=self.headers
@@ -302,19 +354,19 @@ class HiwonderBusServoArmDriver:
         serial_port: str = "/dev/ttyAMA0",
         baudrate: int = 1000000,
         timeout: float = 5.0,
-        servo_ids: list[int] | None = None,
-        home_positions: list[list[int]] | None = None,
-        pick_sequence: list[dict[str, Any]] | None = None,
-        pick_sequence_file: str | None = None,
-        pick_positions: list[list[int]] | None = None,
+        servo_ids: Optional[List[int]] = None,
+        home_positions: Optional[List[List[int]]] = None,
+        pick_sequence: Optional[List[Dict[str, Any]]] = None,
+        pick_sequence_file: Optional[str] = None,
+        pick_positions: Optional[List[List[int]]] = None,
         pick_duration: float = 1.0,
         home_duration: float = 1.5,
         collected_weight: float = 0.0,
         review_result: str = "recheck",
-        evidence_url: str | None = None,
+        evidence_url: Optional[str] = None,
         battery: int = 100,
-        bins: dict[str, float] | None = None,
-        home: dict[str, float] | None = None,
+        bins: Optional[Dict[str, float]] = None,
+        home: Optional[Dict[str, float]] = None,
     ) -> None:
         self.serial_port = str(serial_port)
         self.baudrate = int(baudrate)
@@ -350,17 +402,17 @@ class HiwonderBusServoArmDriver:
         self.review_result = str(review_result)
         self.evidence_url = evidence_url
         self.battery = int(battery)
-        self.bins: dict[str, float] = dict(
+        self.bins: Dict[str, float] = dict(
             bins or {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
         )
         home = home or {"lng": 119.6540, "lat": 26.3870}
         self.home = Position(float(home["lng"]), float(home["lat"]))
         self._mode = DeviceMode.IDLE
-        self._board: Any | None = None
+        self._board: Optional[Any] = None
 
     @staticmethod
-    def _normalize_positions(positions: Any) -> list[list[int]]:
-        normalized: list[list[int]] = []
+    def _normalize_positions(positions: Any) -> List[List[int]]:
+        normalized: List[List[int]] = []
         for item in positions:
             if not isinstance(item, (list, tuple)) or len(item) != 2:
                 raise ValueError(
@@ -378,8 +430,8 @@ class HiwonderBusServoArmDriver:
         return normalized
 
     @classmethod
-    def _normalize_sequence(cls, sequence: Any) -> list[dict[str, Any]]:
-        normalized: list[dict[str, Any]] = []
+    def _normalize_sequence(cls, sequence: Any) -> List[Dict[str, Any]]:
+        normalized: List[Dict[str, Any]] = []
         for step in sequence or []:
             if isinstance(step, dict):
                 duration = float(step["duration"])
@@ -398,8 +450,23 @@ class HiwonderBusServoArmDriver:
         return normalized
 
     @classmethod
-    def _load_sequence_file(cls, path: str) -> list[dict[str, Any]]:
-        """Load a pick sequence JSON file written by the teach tool."""
+    def _load_sequence_file(cls, path: str) -> List[Dict[str, Any]]:
+        """Load a pick sequence JSON file written by a teach tool.
+
+        Accepts three shapes, because the vendor tooling and ours differ:
+
+        1. Vendor format — a flat list of single-servo positions::
+
+               [1000, 940]
+
+           That is what ``案例5 示教记录实现/bus_servo_record.py`` writes:
+           it records one position per Enter press, for ONE servo. Converted
+           here into single-servo steps so a vendor-recorded file can be
+           replayed without hand-editing.
+
+        2. Our format — a list of ``{"duration":…, "positions": [[id,pos]]}``.
+        3. ``{"steps": [...]}`` wrapping either of the above.
+        """
         try:
             raw = json.loads(Path(path).read_text(encoding="utf-8"))
         except OSError as exc:
@@ -417,9 +484,40 @@ class HiwonderBusServoArmDriver:
                 f"pick_sequence_file {path!r} must contain a list of steps "
                 "or a {'steps': [...]} mapping"
             )
+        # ★ 厂商扁平格式 [1000, 940, …] → 归一化成 step 列表。
+        #   厂商示教程序一次只记一个舵机的位置（用 bus_servo_read_id() 取
+        #   第一个舵机），所以这里按配置的 servo_ids[0] 还原。
+        if raw and all(isinstance(x, (int, float)) for x in raw):
+            return cls._normalize_sequence(
+                [
+                    {
+                        "duration": 1.0,
+                        "positions": [[1, int(round(float(x)))]],
+                    }
+                    for x in raw
+                ]
+            )
         return cls._normalize_sequence(raw)
 
     def _new_board(self) -> Any:
+        # 先查串口在不在，再import SDK —— 顺序反过来会让现场拿到
+        # "SDK unavailable" 这种指向错误的提示（真机没串口时 SDK 是有的，
+        # 真正的原因是舵机走 ROS 而不是串口）。
+        if not Path(self.serial_port).exists():
+            import glob  # noqa: PLC0415
+
+            tty_usb = sorted(glob.glob("/dev/ttyUSB*"))
+            tty_acm = sorted(glob.glob("/dev/ttyACM*"))
+            found = ", ".join(tty_usb + tty_acm) or "none"
+            raise DriverError(
+                f"serial port {self.serial_port} does not exist "
+                f"(ttyUSB/ttyACM present: {found}). "
+                "Either fix driver.serial_port in config.yaml, or — if the "
+                "arm is driven over ROS instead of a UART — the platform "
+                "needs a RosArmDriver implementing the same ArmDriver "
+                "protocol; check `rosnode list` / `rostopic list` on the Pi. "
+                "See docs/competitions/arm-hardware-probe-2026-10-05.md."
+            )
         try:
             import ros_robot_controller_sdk as rrc  # noqa: PLC0415
         except ImportError as exc:
@@ -449,23 +547,79 @@ class HiwonderBusServoArmDriver:
         for servo_id in self.servo_ids:
             board.bus_servo_enable_torque(servo_id, False)
 
+    def _read_servo_telemetry(self, board: Any) -> Dict[str, Any]:
+        """逐个舵机回读电压/温度/位置。
+
+        这是"机械臂真的动了"的硬证据 —— progress 报文是平台自报，
+        而这里的数字来自舵机本身。答辩时被问"怎么证明真机执行了"，
+        拿这个出来比任何架构图都有说服力。
+
+        单个舵机读失败不影响其余（每个都独立 try），因为总线的
+        回读是异步队列、单次调用常常正好赶不上回包。
+        """
+        out: Dict[str, Any] = {}
+        for sid in self.servo_ids:
+            item: Dict[str, Any] = {}
+            for key, fn in (
+                ("vin", board.bus_servo_read_vin),
+                ("temp", board.bus_servo_read_temp),
+                ("position", board.bus_servo_read_position),
+            ):
+                try:
+                    val = fn(sid)
+                    # 厂商 SDK 返回list，取第一个元素
+                    if isinstance(val, (list, tuple)):
+                        val = val[0] if val else None
+                    if isinstance(val, (int, float)):
+                        item[key] = round(float(val), 2)
+                except Exception:  # noqa: BLE001
+                    pass
+            if item:
+                out[str(sid)] = item
+        return out
+
+    def _read_board_voltage(self, board: Any, tries: int = 6) -> Optional[float]:
+        """读控制板电压（mV）。
+
+        ★ `Board.get_battery()` 是**非阻塞**的：它只从已收到的队列里取，
+          队列空就直接返回 None。所以必须先 enable_reception、稍等、
+          再重试几次 —— 原实现只调一次，等于永远读不到，battery 恒为
+          构造时的初值。这是"声明了却没实现"的静默缺陷。
+        """
+        for _ in range(tries):
+            try:
+                raw = board.get_battery()
+            except Exception:  # noqa: BLE001
+                return None
+            if isinstance(raw, (int, float)) and raw > 0:
+                return float(raw)
+            time.sleep(0.05)
+        return None
+
     def status(self) -> ArmStatus:
         battery = self.battery
-        if self._board is not None:
+        servos: Dict[str, Any] = {}
+        board = self._board
+        if board is not None:
             try:
-                self._board.enable_reception(True)
-                raw = self._board.get_battery()
-                if isinstance(raw, (int, float)) and raw > 0:
-                    # Vendor reports raw mV; keep the configured prototype
-                    # percentage until a calibrated mapping exists.
-                    battery = self.battery
+                board.enable_reception(True)
+                time.sleep(0.1)
+                servos = self._read_servo_telemetry(board)
+                mv = self._read_board_voltage(board)
+                if mv is not None:
+                    # 控制板电压来自 2S 锂电（标称 7.4V，满电约 8.4V）。
+                    # 这里是**粗略**换算，仅用于"电量明显偏低"的告警，
+                    # 不作为精确 SoC —— 精确 SoC 需要放电曲线标定，暂无。
+                    battery = max(0, min(100, round((mv - 6000.0) / 2400.0 * 100)))
             except Exception:  # noqa: BLE001
+                # 读不到就保持上次的值；不能因遥测失败让整条链路挂掉
                 pass
         return ArmStatus(
             mode=self._mode,
             battery=battery,
             bins=dict(self.bins),
             location=self.home,
+            servos=servos,
         )
 
     def pick(self, task_id: str, target: Position, priority: int) -> PickResult:

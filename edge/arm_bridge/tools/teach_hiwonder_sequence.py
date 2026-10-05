@@ -7,16 +7,14 @@ press ``q`` to save. The output JSON is accepted by
 ``HiwonderBusServoArmDriver`` through ``pick_sequence_file``.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default="/dev/ttyAMA0")
     parser.add_argument("--baudrate", type=int, default=1000000)
@@ -27,9 +25,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def read_positions(board: Any, servo_ids: list[int]) -> list[list[int]]:
+def read_positions(board: Any, servo_ids: List[int]) -> List[List[int]]:
     """Read current 0..1000 positions for every servo id."""
-    positions: list[list[int]] = []
+    positions: List[List[int]] = []
     for servo_id in servo_ids:
         value = board.bus_servo_read_position(servo_id)
         if not value:
@@ -47,13 +45,13 @@ def read_positions(board: Any, servo_ids: list[int]) -> list[list[int]]:
 
 
 def build_output(
-    servo_ids: list[int],
-    steps: list[dict[str, Any]],
+    servo_ids: List[int],
+    steps: List[Dict[str, Any]],
     duration: float,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Build the JSON document consumed by the driver's sequence loader."""
     return {
-        "format": "seasight_hiwonder_pick_sequence",
+        "format": "oceanus_hiwonder_pick_sequence",
         "version": 1,
         "servo_ids": list(servo_ids),
         "default_duration": float(duration),
@@ -63,11 +61,11 @@ def build_output(
 
 def record_loop(
     board: Any,
-    servo_ids: list[int],
+    servo_ids: List[int],
     duration: float,
     output: str,
 ) -> int:
-    steps: list[dict[str, Any]] = []
+    steps: List[Dict[str, Any]] = []
     print("Move the arm to each pose, then press Enter to record it.")
     print("Press q to save and exit.")
     while True:
@@ -94,7 +92,7 @@ def record_loop(
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     if args.duration <= 0:
         print("--duration must be > 0", file=sys.stderr)

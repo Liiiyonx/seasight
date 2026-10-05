@@ -1,4 +1,4 @@
-"""Arm bridge: reusable MQTT contract layer between SeaSight and any arm SDK.
+"""Arm bridge: reusable MQTT contract layer between Oceanus and any arm SDK.
 
 The bridge only depends on the frozen device protocol under ``edge/device_sim``.
 Different arm SDKs (HTTP, serial, CAN) live behind one :class:`ArmDriver`

@@ -385,7 +385,7 @@ def test_hiwonder_driver_loads_pick_sequence_file(tmp_path) -> None:
     seq_file.write_text(
         json.dumps(
             {
-                "format": "seasight_hiwonder_pick_sequence",
+                "format": "oceanus_hiwonder_pick_sequence",
                 "version": 1,
                 "servo_ids": [1, 2],
                 "steps": [

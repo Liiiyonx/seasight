@@ -1,18 +1,39 @@
 # ============================================================
-# SeaSight arm bridge configuration
+# Oceanus arm bridge configuration
 # ============================================================
 # The bridge subscribes to robot/{device_id}/task and
 # robot/{device_id}/cmd, then translates arm driver results into
 # ACK / progress / telemetry messages.
 
 site_id: "lianjiang"
-device_id: "RBT-ARM-01"
+
+# ★★★ device_id 必须与平台侧已登记的机器人 ID 一致 ★★★
+#
+# 平台是**数据驱动**的：机器人来自 backend/db/init/02_seed.sql 的
+# t_device 表，只有 RBT-001 / RBT-002 / RBT-003 三台。平台按
+# `robot/{robot_id}/task` 派单，而本 bridge 订阅 `robot/{device_id}/task`
+# —— **ID 值不同则主题永不相交，平台派的单 bridge 收不到**，
+# 而且**不报任何错**（订阅成功、发布成功，就是互相看不见）。
+#
+# 我第一版写的是 RBT-ARM-01，平台里根本没有这个设备 —— 已修正。
+# 若要为这台机械臂单独建档，需在 02_seed.sql 的 t_device 里新增一行，
+# 并把此值同步（同时要更新 deploy/emqx/oceanus_acl.conf 的 ACL 规则）。
+device_id: "RBT-001"
 
 mqtt:
+  # ★ 本文件**进仓库**，绝不能写真实密码。
+  #   密码只落在 .env（已 gitignore），由 scripts/gen_local_secrets.py 生成，
+  #   部署时导出为环境变量注入 —— 见 deploy_bridge_to_pi.py 的 _mqtt_env()。
+  #   main.py 的 _mqtt_with_env_overrides() 会按 ARM_MQTT_PASSWORD 优先覆盖。
+  #
+  # 账号 robot_device 的 ACL 是**最小权限**：只能发自己的遥测
+  # （marine/+/+/telemetry|status）、只能收自己的任务（robot/+/task|cmd），
+  # 其余全部 deny —— 见 deploy/emqx/bootstrap.csv。
   host: "localhost"
   port: 1883
   username: "robot_device"
-  password: "CHANGE_ME"
+  password: "CHANGE_ME"          # ← 占位；真实值走环境变量
+  password_env: "ARM_MQTT_PASSWORD"
   keepalive: 60
   use_lwt: true
 
@@ -55,7 +76,29 @@ driver:
   #     endpoint: "http://192.168.1.101:8080/dobot"
   #     ...
   #
+  # ---- 真机：走厂商 ROS 控制栈（推荐，2026-10-05 实测可用）----
+  #
+  # 厂商的 hiwonder_servo_manager 节点已持有 /dev/ttyS0，直连串口会与它
+  # 抢总线（半双工，必须独占）。本驱动复用 ros_control action，
+  # 与厂商程序**和平共存**，还能拿到有物理意义的关节角（弧度）。
+  #
+  # 前提：bridge 与机械臂在同一台树莓派上（或至少能访问其 ROS master）。
+  # 实测 joint_states：[joint1..joint5, r_joint]
+  #   positions = [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802] rad
+  #             = [0°, 30°, -78°, -100.8°, 0°, -102°]  ← 厂商标定的 home 位
+  #
+  # ros_arm_control:
+  #   arm_controller: "arm_controller"
+  #   gripper_controller: "gripper_controller"
+  #   # home_rad 为实测厂商标定值；pick_rad **必须示教确认**，
+  #   # 直接用 home 位当抓取位会抓空。
+  #   home_rad: [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802]
+  #   pick_rad: [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802]
+
   # Hiwonder Raspberry Pi bus-servo arms use the vendor SDK on the Pi.
+  # ★ 直连串口**必须先停掉厂商节点**（它占着 /dev/ttyS0），否则抢不到总线。
+  #   sudo systemctl stop armpi_fpv_bringup
+  # 优先级：能用 ros_arm_control 就别用这条 —— 串口那条与厂商 GUI 互斥。
   # pick_sequence positions are pre-taught servo positions (0..1000), not GPS
   # coordinates. Record them with the vendor's teach-and-playback example.
   # Alternatively record with tools/teach_hiwonder_sequence.py and set
@@ -80,17 +123,33 @@ driver:
 
     hiwonder_bus_servo:
       kind: "hiwonder_bus_servo"
+      # ---- 以下三项来自厂商 SDK 源码，勿凭印象改 ----
+      # 波特率 1000000 / 默认设备 /dev/ttyAMA0 / 位置量程 0..1000
+      # 见 ros_robot_controller_sdk.py: Board.__init__(device, baudrate, timeout)
       serial_port: "/dev/ttyAMA0"
       baudrate: 1000000
       timeout: 5.0
-      servo_ids: [1, 2, 3, 4]
-      home_positions: [[1, 500], [2, 500]]
+      # ★ 实测本机是 6 自由度：joint1..joint5 + r_joint(机械爪)，
+      #   对应总线舵机 ID 1..6。厂商默认例程只给 4 个，是通用示例不是本机配置。
+      #   示教前先用「案例1 获取总线舵机信息」核对实际在线 ID 列表。
+      servo_ids: [1, 2, 3, 4, 5, 6]
+      # 500 = 中位。仅作回位兜底，**不是**已标定的 home 位，
+      # 真实 home 位请读 /joint_states 换算后填入 ros_arm_control.home_rad。
+      home_positions: [[1, 500], [2, 500], [3, 500], [4, 500], [5, 500], [6, 500]]
+      # 抓取姿态：脉冲 0..1000 的**预先示教值**，不是 GPS 坐标。
+      # ★ 目前下方是厂商示例值，**直接跑会抓空** —— 必须先示教覆盖：
+      #   方式 A（厂商例程）：案例5 示教记录实现/bus_servo_record.py
+      #   方式 B（我们的工具，输出更规整）：
+      #     python3 tools/teach_hiwonder_sequence.py --servo-ids 1 2 3 4 5 6 \
+      #       --output pick_sequence.json
+      #     然后设 pick_sequence_file: "pick_sequence.json" 并注释掉 pick_sequence
+      # 驱动侧兼容厂商扁平格式 [1000, 940] 与我们的 steps 结构，无需手工转换。
       # pick_sequence_file: "pick_sequence.json"
       pick_sequence:
         - duration: 1.0
-          positions: [[1, 650], [2, 500]]
+          positions: [[1, 650], [2, 500], [3, 500], [4, 500], [5, 500], [6, 500]]
         - duration: 1.0
-          positions: [[1, 300], [2, 600]]
+          positions: [[1, 300], [2, 600], [3, 500], [4, 500], [5, 500], [6, 500]]
       collected_weight: 0.0
       review_result: "recheck"
       battery: 100

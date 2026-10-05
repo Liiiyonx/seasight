@@ -607,7 +607,7 @@ defineExpose({ fitToData })
   padding: 3px 6px;
   background: rgba(255, 255, 255, 0.72);
   color: #63717a;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 :deep(.simulation-robot-icon),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 相机标定与平面映射工具（WP-13）。
+"""探海灵眸 Oceanus — 相机标定与平面映射工具（WP-13）。
 
 功能：
   1. `chessboard`  —— 棋盘格内参标定（cv2.calibrateCamera）+ 畸变系数 +
@@ -345,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ap = argparse.ArgumentParser(
         prog="calibrate_camera",
-        description="SeaSight 相机标定（OpenCV 传统视觉，非训练模型）— WP-13",
+        description="Oceanus 相机标定（OpenCV 传统视觉，非训练模型）— WP-13",
     )
     sub = ap.add_subparsers(dest="command", required=True)
 

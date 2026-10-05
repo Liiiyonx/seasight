@@ -608,7 +608,7 @@ watch(
 }
 
 .tcard__pri {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 5px;
   border-radius: 8px;
   background: rgba(139, 150, 168, 0.16);
@@ -856,11 +856,35 @@ watch(
   }
 }
 
-@media (max-width: 520px) {
-  .kanban__col {
-    flex-basis: 86vw;
+@media (max-width: 620px) {
+  /* 看板改纵向堆叠：每列全宽、列内限高滚动。
+     配合顶部状态 chip 的筛选（点选后 columns 只剩一列），
+     就是移动端的「状态 Tab + 单列列表」，替代原先 5 列长横滚。 */
+  .kanban {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    overflow: visible;
+    scroll-snap-type: none;
   }
 
+  .kanban__col {
+    flex: none;
+    max-height: none;
+    scroll-snap-align: none;
+  }
+
+  .kanban__body {
+    max-height: 440px;
+  }
+
+  .status-chip {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
   .tcard__row {
     font-size: 12px;
   }

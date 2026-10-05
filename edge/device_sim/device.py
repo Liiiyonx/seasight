@@ -21,16 +21,14 @@
 不代表真实设备、真实边缘盒或现场验证。
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
 import re
 from collections import deque
-from dataclasses import dataclass, field
+from .py36_compat import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from .protocol import (
     COMMAND_ACTIONS,
@@ -58,7 +56,7 @@ DEVICE_SIM_SEQ_FILE_ENV = "DEVICE_SIM_SEQ_FILE"
 # ----------------------------------------------------------------------
 # 遥测序号跨进程持久化（WP-14E）
 # ----------------------------------------------------------------------
-def load_seq_from_file(path: str | os.PathLike) -> tuple[int, str]:
+def load_seq_from_file(path: Union[str, os.PathLike]) -> Tuple[int, str]:
     """读取上次持久化的遥测序号，返回 ``(seq, status)``。
 
     status 取值：
@@ -94,7 +92,7 @@ def load_seq_from_file(path: str | os.PathLike) -> tuple[int, str]:
     return 0, "corrupt"
 
 
-def save_seq_atomic(path: str | os.PathLike, seq: int) -> bool:
+def save_seq_atomic(path: Union[str, os.PathLike], seq: int) -> bool:
     """原子写盘：先写同目录临时文件再 ``os.replace`` 替换，避免半截文件。
 
     写盘失败返回 False（调用方降级为仅内存推进），不抛异常。
@@ -161,7 +159,7 @@ class TwinConfig:
     arrive_radius_deg: float = 0.00002
     outbox_size: int = 1000
     command_processing_delay: float = 0.0
-    bins: dict[str, float] = field(
+    bins: Dict[str, float] = field(
         default_factory=lambda: {"foam": 0.0, "plastic": 0.0, "mixed": 0.0}
     )
 
@@ -175,21 +173,21 @@ class DeviceTwin:
     def __init__(
         self,
         device_id: str,
-        transport: DeviceTransport | None = None,
+        transport: Optional[DeviceTransport] = None,
         *,
-        clock: Clock | None = None,
-        id_factory: IdFactory | None = None,
-        config: TwinConfig | None = None,
-        event_sink: list[dict[str, Any]] | None = None,
-        telemetry_modifier: Callable[[Telemetry], None] | None = None,
-        seq_store_path: str | os.PathLike | None = None,
+        clock: Optional[Clock] = None,
+        id_factory: Optional[IdFactory] = None,
+        config: Optional[TwinConfig] = None,
+        event_sink: Optional[List[Dict[str, Any]]] = None,
+        telemetry_modifier: Optional[Callable[[Telemetry], None]] = None,
+        seq_store_path: Optional[Union[str, os.PathLike]] = None,
     ) -> None:
         self.device_id = device_id
         self.transport = transport or MemoryTransport()
         self.clock = clock or FakeClock(0.0)
         self.id_factory = id_factory or SequentialIdFactory("ack")
         self.config = config or TwinConfig()
-        self.events: list[dict[str, Any]] = (
+        self.events: List[Dict[str, Any]] = (
             event_sink if event_sink is not None else []
         )  # 与场景 runner 共享的事件流水
         #: 可选遥测修改器（场景噪声注入用）：在发布前对 Telemetry 就地修改。
@@ -204,12 +202,12 @@ class DeviceTwin:
         # 物理状态
         self.mode: str = DeviceMode.IDLE
         self.battery: float = float(self.config.initial_battery)
-        self.position: Position | None = Position(
+        self.position: Optional[Position] = Position(
             self.config.base_position.lng, self.config.base_position.lat
         )
-        self.bins: dict[str, float] = dict(self.config.bins)
-        self.mission_id: str | None = None
-        self.mission_target: Position | None = None
+        self.bins: Dict[str, float] = dict(self.config.bins)
+        self.mission_id: Optional[str] = None
+        self.mission_target: Optional[Position] = None
 
         # 遥测序号（单调递增）。WP-14E：支持跨进程持久化 —— 路径可经构造
         # 参数 ``seq_store_path`` 或环境变量 DEVICE_SIM_SEQ_FILE 配置，
@@ -219,7 +217,7 @@ class DeviceTwin:
         # 不回退到 0、不重复已用序号。
         if seq_store_path is None:
             seq_store_path = os.environ.get(DEVICE_SIM_SEQ_FILE_ENV) or None
-        self.seq_store_path: str | None = str(seq_store_path) if seq_store_path else None
+        self.seq_store_path: Optional[str] = str(seq_store_path) if seq_store_path else None
         self.seq: int = 0
         if self.seq_store_path:
             restored, status = load_seq_from_file(self.seq_store_path)
@@ -239,25 +237,25 @@ class DeviceTwin:
             # status == "missing"：首次运行，正常从 0 开始
 
         # 命令/回执状态
-        self._pending: list[DeviceCommand] = []
-        self._batch_acks: list[Ack] = []
-        self._acked: dict[str, Ack] = {}  # command_id -> 最近一次回执（幂等复回）
-        self._mode_before_estop: str | None = None
-        self._mode_before_pause: str | None = None
+        self._pending: List[DeviceCommand] = []
+        self._batch_acks: List[Ack] = []
+        self._acked: Dict[str, Ack] = {}  # command_id -> 最近一次回执（幂等复回）
+        self._mode_before_estop: Optional[str] = None
+        self._mode_before_pause: Optional[str] = None
 
         # 故障状态
-        self._fault_flags: set[str] = set()
-        self._fault_lifecycle: dict[str, dict[str, float | None]] = {}
+        self._fault_flags: Set[str] = set()
+        self._fault_lifecycle: Dict[str, Dict[str, Optional[float]]] = {}
 
         # 断网 Outbox
-        self._outbox: deque[tuple[str, dict[str, Any], int]] = deque(
+        self._outbox: deque[Tuple[str, Dict[str, Any], int]] = deque(
             maxlen=self.config.outbox_size
         )
         self._was_connected: bool = bool(self.transport.connected)
 
         self._started = False
-        self.history: dict[str, list[Any]] = {"acks": [], "telemetry": [], "commands": []}
-        self.counter: dict[str, int] = {
+        self.history: Dict[str, List[Any]] = {"acks": [], "telemetry": [], "commands": []}
+        self.counter: Dict[str, int] = {
             "commands_processed": 0,
             "commands_rejected": 0,
             "commands_invalid": 0,
@@ -293,7 +291,7 @@ class DeviceTwin:
     # ------------------------------------------------------------------
     # 入站命令
     # ------------------------------------------------------------------
-    def _on_command(self, topic: str, payload: dict[str, Any]) -> None:
+    def _on_command(self, topic: str, payload: Dict[str, Any]) -> None:
         try:
             cmd = DeviceCommand.from_dict(payload)
         except (KeyError, TypeError, ValueError) as exc:
@@ -307,7 +305,7 @@ class DeviceTwin:
         self._pending.append(cmd)
         self._event("command_queued", command_id=cmd.command_id, action=cmd.action, seq=cmd.seq)
 
-    def receive_command(self, command: DeviceCommand | dict[str, Any]) -> None:
+    def receive_command(self, command: Union[DeviceCommand, Dict[str, Any]]) -> None:
         """直接注入一条命令（测试用，等价于 transport 回调路径）。"""
         if isinstance(command, dict):
             command = DeviceCommand.from_dict(command)
@@ -333,7 +331,7 @@ class DeviceTwin:
         self._step_world()
         return self._publish_telemetry()
 
-    def _drain_pending(self) -> list[DeviceCommand]:
+    def _drain_pending(self) -> List[DeviceCommand]:
         """取出一批待处理命令：按 seq 升序，emergency_stop 无条件插队最前。"""
         if not self._pending:
             return []
@@ -395,7 +393,7 @@ class DeviceTwin:
     # ------------------------------------------------------------------
     # 动作执行（返回 (accepted, reason)）
     # ------------------------------------------------------------------
-    def _apply_action(self, action: str, params: dict[str, Any], now: float) -> tuple[bool, str]:
+    def _apply_action(self, action: str, params: Dict[str, Any], now: float) -> Tuple[bool, str]:
         if action == "dispatch":
             return self._do_dispatch(params)
         if action == "pause":
@@ -410,7 +408,7 @@ class DeviceTwin:
             return True, "ack_echo"
         return False, "unknown_action"
 
-    def _do_dispatch(self, params: dict[str, Any]) -> tuple[bool, str]:
+    def _do_dispatch(self, params: Dict[str, Any]) -> Tuple[bool, str]:
         target = params.get("target")
         if not isinstance(target, dict) or "lng" not in target or "lat" not in target:
             return False, "missing_target"
@@ -423,7 +421,7 @@ class DeviceTwin:
         self._event("mode_change", mode=self.mode, mission_id=mission_id)
         return True, "dispatched"
 
-    def _do_pause(self) -> tuple[bool, str]:
+    def _do_pause(self) -> Tuple[bool, str]:
         if self.mode in (DeviceMode.NAVIGATING, DeviceMode.COLLECTING, DeviceMode.RETURNING):
             self._mode_before_pause = self.mode
             self.mode = DeviceMode.PAUSED
@@ -433,7 +431,7 @@ class DeviceTwin:
             return True, "already_paused"
         return True, "noop"
 
-    def _do_resume(self) -> tuple[bool, str]:
+    def _do_resume(self) -> Tuple[bool, str]:
         if self.mode == DeviceMode.E_STOP:
             self.mode = self._mode_before_estop or DeviceMode.NAVIGATING
             self._mode_before_estop = None
@@ -447,7 +445,7 @@ class DeviceTwin:
             return True, "resumed"
         return True, "noop"
 
-    def _do_return_home(self) -> tuple[bool, str]:
+    def _do_return_home(self) -> Tuple[bool, str]:
         if self.mode in (DeviceMode.NAVIGATING, DeviceMode.COLLECTING, DeviceMode.PAUSED):
             self.mode = DeviceMode.RETURNING
             self._event("mode_change", mode=self.mode)
@@ -458,7 +456,7 @@ class DeviceTwin:
             return True, "already_home"
         return False, "device_in_emergency_stop"
 
-    def _do_emergency_stop(self) -> tuple[bool, str]:
+    def _do_emergency_stop(self) -> Tuple[bool, str]:
         if self.mode == DeviceMode.E_STOP:
             return True, "already_emergency_stop"
         self._mode_before_estop = self.mode
@@ -561,7 +559,7 @@ class DeviceTwin:
             self.mode = DeviceMode.RETURNING
             self._event("mode_change", mode=self.mode, reason="battery_critical_auto_return")
 
-    def _move_toward(self, target: Position, step: float) -> tuple[Position, bool]:
+    def _move_toward(self, target: Position, step: float) -> Tuple[Position, bool]:
         """向目标移动一步（经纬度），到达返回 (目标点, True)。"""
         if self.position is None:
             self.position = Position(self.config.base_position.lng, self.config.base_position.lat)
@@ -707,7 +705,7 @@ class DeviceTwin:
         return telemetry
 
     def _publish_outbound(
-        self, topic: str, payload: dict[str, Any], qos: int, *, kind: str
+        self, topic: str, payload: Dict[str, Any], qos: int, *, kind: str
     ) -> bool:
         """出站发布：在线直发，离线进入 Outbox 排队（断网排队）。"""
         if self.transport.connected:
@@ -731,7 +729,7 @@ class DeviceTwin:
         if sent:
             self._event("outbox_flushed", count=sent)
 
-    def _flush_outbox(self, batch: int | None = None) -> int:
+    def _flush_outbox(self, batch: Optional[int] = None) -> int:
         """按原顺序补传 Outbox；中途再次断线则剩余留在队首。"""
         sent = 0
         while self._outbox:
@@ -748,7 +746,7 @@ class DeviceTwin:
     # ------------------------------------------------------------------
     # 观测
     # ------------------------------------------------------------------
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> Dict[str, Any]:
         """当前状态快照（不产生副作用）。"""
         return {
             "device_id": self.device_id,

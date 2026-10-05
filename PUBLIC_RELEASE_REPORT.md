@@ -1,20 +1,20 @@
-# SeaSight 公开快照报告
+# Oceanus 公开快照报告
 
-- 生成时间：2026-09-30 12:34 UTC
-- 文件数：343
-- 总体积：9.94 MiB
+- 生成时间：2026-10-05 15:09 UTC
+- 文件数：408
+- 总体积：10.95 MiB
 - 来源：私有开发仓库的显式允许清单（非历史推送）
 
 ## 顶层分布
 
 | 顶层 | 文件数 | 体积 |
 | --- | ---: | ---: |
-| `(根目录)` | 9 | 0.08 MiB |
-| `backend` | 155 | 1.88 MiB |
-| `deploy` | 6 | 0.01 MiB |
-| `docs` | 12 | 0.32 MiB |
-| `edge` | 34 | 0.41 MiB |
-| `frontend` | 59 | 6.51 MiB |
-| `integrations` | 10 | 0.04 MiB |
-| `ml` | 22 | 0.21 MiB |
-| `scripts` | 36 | 0.47 MiB |
+| `(根目录)` | 9 | 0.09 MiB |
+| `backend` | 156 | 1.92 MiB |
+| `deploy` | 8 | 0.02 MiB |
+| `docs` | 22 | 0.41 MiB |
+| `edge` | 40 | 0.50 MiB |
+| `frontend` | 68 | 6.90 MiB |
+| `integrations` | 10 | 0.05 MiB |
+| `ml` | 22 | 0.22 MiB |
+| `scripts` | 73 | 0.84 MiB |

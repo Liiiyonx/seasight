@@ -1,6 +1,6 @@
 ---
 name: dispatch-work-order-orchestration
-description: Orchestrate event assessment, SeaSight Agent execution, human approval, and work-order verification while keeping the execution endpoint replaceable. Use for dispatch or remediation workflows.
+description: Orchestrate event assessment, Oceanus Agent execution, human approval, and work-order verification while keeping the execution endpoint replaceable. Use for dispatch or remediation workflows.
 ---
 
 # Dispatch Work Order Orchestration

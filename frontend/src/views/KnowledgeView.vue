@@ -1709,7 +1709,7 @@ onMounted(() => {
   background: rgba(0, 122, 255, 0.09);
   color: var(--c-info);
   font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -2186,7 +2186,7 @@ onMounted(() => {
   padding: 1px 4px;
   overflow: hidden;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.4;
   text-overflow: ellipsis;

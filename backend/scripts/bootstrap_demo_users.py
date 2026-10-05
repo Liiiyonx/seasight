@@ -1,4 +1,4 @@
-"""Provision the quick-login accounts shown on the SeaSight login page.
+"""Provision the quick-login accounts shown on the Oceanus login page.
 
 This script is intentionally separate from the normal ``create_user.py`` path:
 the legacy competition demo passwords are shorter than the production account

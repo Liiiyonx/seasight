@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""探海灵眸 SeaSight — 感知数据标注转换与完整性校验核心（WP-13）。
+"""探海灵眸 Oceanus — 感知数据标注转换与完整性校验核心（WP-13）。
 
-冻结格式：SeaSight COCO-like JSON（schema_version "1.0"），详见
+冻结格式：Oceanus COCO-like JSON（schema_version "1.0"），详见
 `docs/perception-data-protocol.md`。本模块提供：
 
   1. `validate_dataset`  —— 协议级完整性校验（结构、图片路径、类别、bbox、
                           面积、重复 ID、引用完整、跨 split 泄漏、校验和、
                           证据等级纪律），坏样本跳过并列入报告。
-  2. `seasight_to_yolo`  —— SeaSight JSON → YOLO txt（每行 class cx cy w h 归一化）。
-  3. `yolo_to_seasight`  —— YOLO txt 目录 → SeaSight JSON（明确导入入口，
+  2. `seasight_to_yolo`  —— Oceanus JSON → YOLO txt（每行 class cx cy w h 归一化）。
+  3. `yolo_to_seasight`  —— YOLO txt 目录 → Oceanus JSON（明确导入入口，
                           标注 source_type="imported"、review_status="unreviewed"）。
 
 能力口径（冻结）：
@@ -386,7 +386,7 @@ def validate_dataset(
     check_checksums: bool = True,
     verify_dimensions: bool = False,
 ) -> dict[str, Any]:
-    """完整校验一份 SeaSight COCO-like JSON，返回报告。
+    """完整校验一份 Oceanus COCO-like JSON，返回报告。
 
     坏样本（问题标注/图片）不删除数据，而是进入 skipped_samples 并计数，
     调用方根据 status 决定是否放行。
@@ -522,7 +522,7 @@ def _image_size(path: Path) -> tuple[int, int] | None:
 
 
 # ----------------------------------------------------------------------
-# SeaSight JSON → YOLO txt
+# Oceanus JSON → YOLO txt
 # ----------------------------------------------------------------------
 
 def seasight_to_yolo(
@@ -532,7 +532,7 @@ def seasight_to_yolo(
     strict: bool = False,
     source_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """把 SeaSight JSON 的标注导出为 YOLO txt（class cx cy w h，归一化 0~1）。
+    """把 Oceanus JSON 的标注导出为 YOLO txt（class cx cy w h，归一化 0~1）。
 
     - 只导出校验通过的标注（坏样本跳过并列入报告）。
     - 负样本图片（无有效标注）不生成标签文件，报告计数。
@@ -601,7 +601,7 @@ def seasight_to_yolo(
 
 
 # ----------------------------------------------------------------------
-# YOLO txt → SeaSight JSON（导入入口）
+# YOLO txt → Oceanus JSON（导入入口）
 # ----------------------------------------------------------------------
 
 def yolo_to_seasight(
@@ -620,7 +620,7 @@ def yolo_to_seasight(
     skip_image_hash: bool = False,
     contract_reference: str | None = None,
 ) -> dict[str, Any]:
-    """从 YOLO txt 目录导入为 SeaSight COCO-like JSON。
+    """从 YOLO txt 目录导入为 Oceanus COCO-like JSON。
 
     导入纪律（冻结）：
       - 所有标注 source_type="imported"、review_status="unreviewed"（须人工复核）；
@@ -839,7 +839,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_checksums=not args.no_check_checksums,
         verify_dimensions=args.verify_dimensions,
     )
-    _print_report(report, "SeaSight 数据集校验")
+    _print_report(report, "Oceanus 数据集校验")
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -858,7 +858,7 @@ def _cmd_to_yolo(args: argparse.Namespace) -> int:
     report = seasight_to_yolo(
         data, args.images_root, args.output, strict=args.strict, source_path=args.input
     )
-    _print_report(report, "SeaSight → YOLO 导出")
+    _print_report(report, "Oceanus → YOLO 导出")
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -898,7 +898,7 @@ def _cmd_from_yolo(args: argparse.Namespace) -> int:
     except DependencyError as e:
         print(f"[错误] {e}", file=sys.stderr)
         return 3
-    _print_report(report, "YOLO → SeaSight 导入")
+    _print_report(report, "YOLO → Oceanus 导入")
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -913,11 +913,11 @@ def _cmd_from_yolo(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="convert_annotations",
-        description="SeaSight COCO-like JSON 标注转换与校验（WP-13）",
+        description="Oceanus COCO-like JSON 标注转换与校验（WP-13）",
     )
     sub = ap.add_subparsers(dest="command", required=True)
 
-    p_validate = sub.add_parser("validate", help="校验 SeaSight JSON")
+    p_validate = sub.add_parser("validate", help="校验 Oceanus JSON")
     p_validate.add_argument("--input", required=True)
     p_validate.add_argument("--images-root", default=None, help="数据集根目录（校验图片路径/校验和）")
     p_validate.add_argument("--no-check-files", action="store_true")
@@ -926,7 +926,7 @@ def main(argv: list[str] | None = None) -> int:
     p_validate.add_argument("--report", default=None, help="报告 JSON 输出路径")
     p_validate.set_defaults(func=_cmd_validate)
 
-    p_toyolo = sub.add_parser("to-yolo", help="SeaSight JSON → YOLO txt")
+    p_toyolo = sub.add_parser("to-yolo", help="Oceanus JSON → YOLO txt")
     p_toyolo.add_argument("--input", required=True)
     p_toyolo.add_argument("--images-root", default=".", help="数据集根目录（用于定位 file_name）")
     p_toyolo.add_argument("--output", required=True, help="输出根目录（生成 labels/<split>/*.txt）")
@@ -934,7 +934,7 @@ def main(argv: list[str] | None = None) -> int:
     p_toyolo.add_argument("--strict", action="store_true")
     p_toyolo.set_defaults(func=_cmd_to_yolo)
 
-    p_fromyolo = sub.add_parser("from-yolo", help="YOLO txt → SeaSight JSON（导入）")
+    p_fromyolo = sub.add_parser("from-yolo", help="YOLO txt → Oceanus JSON（导入）")
     p_fromyolo.add_argument("--images", required=True, help="图片目录")
     p_fromyolo.add_argument("--labels", required=True, help="标签目录（结构镜像 images/）")
     p_fromyolo.add_argument("--output", required=True, help="输出 dataset.json")
