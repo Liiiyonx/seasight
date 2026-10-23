@@ -1,0 +1,27 @@
+# Oceanus 机械臂智能拾取子系统 · 运行时依赖（树莓派侧）
+#
+# 说明：
+# - rospy / cv_bridge / hiwonder_servo_msgs / 厂商 kinematics 与
+#   armpi_fpv_common **不在此列** —— 它们来自厂商 ROS 工作空间，
+#   由 `source devel/setup.bash` 提供，不能也不该由 pip 安装。
+# - ultralytics 仅训练档需要；推理走 NCNN，不依赖它。
+# - 树莓派上装 opencv 建议用系统包（python3-opencv），避免源码编译。
+
+# 作业台 Web 服务
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+
+# 平台派单只读订阅（作业台显示工单上下文）
+paho-mqtt>=2.0
+
+# 图像与数值处理
+opencv-python>=4.8      # 树莓派可改用 apt 的 python3-opencv
+numpy>=1.24
+PyYAML>=6.0
+
+# 现场再训练（只在训练/评估档需要，推理不需要）
+ultralytics>=8.1        # train.py / evaluate.py 使用；缺省时训练档会明确报错
+
+# NCNN 推理（可选，缺省时退回 OpenCV DNN）
+# ncnn 无官方 pip 包，树莓派上按 NCNN 文档编译或在训练机上转换后拷模型

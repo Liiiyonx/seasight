@@ -1,0 +1,80 @@
+# 数据集目录（内容不入 git）
+
+真实的图片与标签**不进仓库** —— 体积大、且属于原始数据资产。
+这里只保留目录骨架，让 clone 下来的人一眼看清该怎么放数据。
+
+`ml/datasets/**` 已被 `.gitignore` 排除，唯一的例外是本文件所在层级
+（见 .gitignore 的 `!ml/datasets/.gitkeep`）。
+
+---
+
+## 期望的目录结构
+
+```
+ml/datasets/seasight/
+├── images/
+│   ├── train/     训练集图片
+│   └── val/       验证集图片
+└── labels/
+    ├── train/     训练集标签（YOLO txt 格式）
+    └── val/       验证集标签
+```
+
+**这些目录不预先建在仓库里，需要你自己建。** 原因：
+
+1. Git 不跟踪空目录 —— 建了也传不上去，clone 的人拿到的仍是没有目录的仓库。
+   唯一能让空目录进仓库的办法是往里塞占位文件，但那样 `seasight/images/train/`
+   会多出一个 `.gitkeep`，而 Ultralytics 会把**目录下所有文件**当图片扫描，
+   某些版本遇到非图片后缀会直接报错。
+2. 数据本来就不入库（`ml/datasets/**` 已被 `.gitignore` 排除），
+   目录由"放数据的人"顺手建出来最自然。
+
+首次放置数据时执行：
+
+```bash
+mkdir -p ml/datasets/seasight/{images,labels}/{train,val}
+```
+
+或直接 `cp -r` 一份已标注好的数据集进 `ml/datasets/seasight/`。
+
+> 顺带说明 `check_dataset.py` 的行为：目录不存在时它输出
+> `⚠ 没有找到任何图片` 并把该 split 记零，**不报错**——
+> 因为"还没采集"是正常状态，不该阻断 CI。
+
+Ultralytics 的约定是：**只配 `images/`，`labels/` 由框架自动推导**
+（把路径里的 `images` 换成 `labels`）。所以 `ml/configs/seasight.yaml`
+里只写 `train: images/train`，不用也不该写 labels 路径。
+
+## 图片与标签必须严格配对
+
+每个 `images/xxx/foo.jpg` 都要有对应的 `labels/xxx/foo.txt`。
+少一个会导致训练时警告、多一个会让框架报错。配对检查：
+
+```bash
+python ml/scripts/check_dataset.py     # 见下方说明
+```
+
+## 标签格式（YOLO txt）
+
+每行一个目标，归一化到 0~1：
+
+```
+<class_id> <cx> <cy> <w> <h>
+```
+
+- `<class_id>` 是 **0 起的类别索引**，与 `ml/configs/seasight.yaml`
+  里 `names:` 的**顺序强绑定**。改顺序等于让所有旧标签失效，
+  必须重训 —— 这不是"改个名"那么轻。
+- 坐标是相对整图的归一化值，不是像素。
+
+## 标注工具建议
+
+`labelImg` 或 `X-AnyLabeling`（后者支持 SAM 辅助分割，海漂垃圾边缘模糊时
+比纯手框效率高很多）。导出格式选 **YOLO**，不要选 VOC XML。
+
+## 数据来源
+
+连江黄岐半岛、马鼻、晓澳等养殖区的实拍与公开海漂垃圾数据集混合。
+划分比例建议 8:2，**按拍摄批次划分而不是随机划分** ——
+随机划分会让同一段视频的相邻帧同时出现在训练集和验证集里，
+验证指标虚高（模型其实"见过"这些帧）。

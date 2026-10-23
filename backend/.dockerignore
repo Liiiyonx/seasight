@@ -1,0 +1,60 @@
+# 后端构建上下文排除清单
+#
+# 后端上下文比前端小得多（源码 ~700KB），所以这里主要不是为提速，
+# 而是为了**避免把本地状态和密钥打进镜像**：
+#   - .env 里是真密码
+#   - __pycache__ 是宿主机 Python 版本编的字节码，容器里版本不同会出玄学问题
+#   - .git 带上会让镜像体积翻倍，还泄露提交历史
+
+# Python 字节码与缓存
+__pycache__
+**/__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# 虚拟环境
+.venv
+venv
+env
+ENV
+
+# 环境变量 —— ★ 绝不进镜像
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# 测试与本地数据
+# ★ tests/ 刻意**不排除**：CI 里常用同一个镜像跑单元测试
+#   （docker run <img> pytest），排掉就得再维护一份测试镜像。
+#   它只有 104KB，留着成本更低。
+*.db
+*.sqlite3
+*.log
+
+# 编辑器
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# 迁移产物（entrypoint 会按需生成，不需要进镜像）
+# 保留目录本身，排除本地临时文件
+alembic/versions/__pycache__
+
+# AI 模型权重（几 GB，走挂载卷不进镜像）
+ml
+models
+*.onnx
+*.pt
+*.engine
+*.rknn

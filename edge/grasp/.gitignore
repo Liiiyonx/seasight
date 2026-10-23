@@ -1,0 +1,21 @@
+# 本子系统的运行产物，不入库（源码与配置才入库）
+
+# 现场采集的数据集与组装结果（含现场画面，体积大且含真实场景）
+data/
+
+# 模型仓库：versions/ 历史、active/ 当前、index.json、tuning.json
+models/
+
+# 训练产物（ultralytics runs/）
+runs/
+
+# 9 点标定结果：与具体设备/工位绑定，换机器必须重标
+calibration.json
+
+# 姿态预设（操作习惯：某台机器的「初始位」「相机朝下」等）
+presets.json
+
+# 开机默认姿态的导出件：由作业台从 presets.json 生成，再由
+# scripts/sync_boot_pose.py 推到板子上（板子开机读它摆位）。
+# 属于运行产物 —— 每台机器的开机姿态不同，不该入库。
+boot_pose.json

@@ -1,0 +1,21 @@
+[Unit]
+Description=Oceanus 机械臂桥接层（等平台派单，派一次抓一个）
+# ★ 与 oceanus-arm-autopick 互斥：两者都会驱动同一台机械臂，只能启用一个。
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__PI_USER__
+WorkingDirectory=__REPO__/edge
+Environment=PYTHONUNBUFFERED=1
+# 树莓派上 broker 在平台那侧，不是 localhost —— 用 env 覆盖共享配置里的值
+Environment=OCEANUS_MQTT_HOST=__BROKER__
+ExecStart=/bin/bash -lc 'source __ROS_SETUP__ && exec python3 -m arm_bridge.main --config arm_bridge/config.yaml --driver oceanus_vision'
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,44 @@
+[Unit]
+Description=Oceanus 机械臂一键自动抓取（自起厂商 ROS 节点 + 常驻自捡）
+# ★ 与 oceanus-arm-bridge 互斥：两者都会调用同一个 GraspLoop 驱动同一台机械臂，
+#   同时跑两个进程会互相抢舵机总线。同一时刻只启用其中一个。
+Documentation=file:__REPO__/edge/grasp/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+# 连续重启限流：前置不满足时既不无脑重启（见 RestartPreventExitStatus），
+# 撞上偶发故障也别把 journal 刷爆
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=__PI_USER__
+WorkingDirectory=__REPO__/edge
+Environment=PYTHONUNBUFFERED=1
+Environment=OCEANUS_MQTT_HOST=__BROKER__
+# ★ ROS master 地址：systemd 是非交互环境，不读 ~/.bashrc，所以厂商那套
+#   ROS_MASTER_URI 默认值拿不到。板子上 roslaunch 会自分起 roscore（127.0.0.1:11311），
+#   因此默认走本机；master 在别的机器时改这两行的地址（或直接改 __ROS_MASTER__ / __ROS_IP__）。
+Environment=OCEANUS_ROS_MASTER_URI=__ROS_MASTER__
+Environment=OCEANUS_ROS_IP=__ROS_IP__
+# ★ 一条命令包办：source ROS → 起厂商三组 bringup（不含 start_functions）→
+#   等话题就绪 → 只读自检 → 起 supervisor 常驻自捡。
+#   厂商节点由该脚本托管，服务停止时一并回收（脚本退出前按 launch 名回收）。
+ExecStart=/bin/bash -lc 'exec bash __REPO__/edge/grasp/deploy/run_autopick.sh --ros-setup __ROS_SETUP__ --log-dir /var/log/oceanus-autopick'
+Restart=on-failure
+RestartSec=15
+# 退出码含义（见 run_autopick.sh 头注释）：
+#   2 = 前置不满足（缺 ROS / 标定 / 模型 / 放置点）
+#   3 = 连续抓取失败超限
+#   4 = 厂商节点超时未就绪
+# 这四种都是「要人去修」的状态，不能让 systemd 无脑重启刷日志。
+RestartPreventExitStatus=2 3 4
+# 停止时先 TERM 主进程（脚本会转给 supervisor 优雅收尾并回收 ROS 节点），
+# 90s 还没完再 KILL —— 比 systemd 默认的 90s/全组 KILL 更可控
+KillMode=mixed
+TimeoutStopSec=90
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

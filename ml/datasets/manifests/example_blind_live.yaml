@@ -1,0 +1,44 @@
+# ============================================================
+# 示例：现场盲测集清单（manifest_type: blind）
+# ★ 交付答辩前封存（status: sealed），现场演示时才解锁；禁止参与训练/调参。
+# 当前仅演示结构 —— 未采集任何图片，status: planned，E0。
+# ============================================================
+schema_version: "1.0"
+manifest_type: blind
+name: blind_20260918_lianjiang_example
+description: "现场盲测集示例：答辩前封存、现场演示使用（结构演示，无真实图片）"
+
+status: planned
+
+isolation:
+  method: physical
+  physical_note: "只读介质/只读目录封存（如只读移动硬盘或只读挂载）；sealed 状态后任何写入均视为违规"
+  logical_rule: "blind 与 train/val/test 三方互不重叠；仅现场演示流程可读取，评测脚本默认不评测 blind 分集"
+
+data_type: synthetic
+evidence_level: E0
+
+location:
+  images: ../seasight_blind/images/blind
+  labels: ../seasight_blind/labels/blind
+  video: null
+
+annotation:
+  format: yolo_txt
+  iou_threshold: 0.5
+
+created: "2026-09-18"
+owner: "感知负责人"
+source:
+  device: "CAM-MABI-01"
+  region: "连江马鼻码头（封存批次）"
+  date_range: ["2026-11-01", "2026-11-05"]
+  license: "合成帧，无授权约束（自研）"
+
+sample_count: 0
+
+confounders:
+  - lighting
+  - background
+  - target_size
+  - weather

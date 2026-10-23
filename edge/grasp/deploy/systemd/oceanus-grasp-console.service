@@ -1,0 +1,21 @@
+[Unit]
+Description=Oceanus 机械臂训练作业台（网页 :8090：采集 / 标注 / 训练 / 部署 / 标定）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__PI_USER__
+WorkingDirectory=__REPO__/edge
+Environment=PYTHONUNBUFFERED=1
+# 作业台要显示「平台派单上下文」，同样需要能连到平台那侧的 broker
+Environment=OCEANUS_MQTT_HOST=__BROKER__
+# ROS 没起来也不会崩：服务照常起，页面显示排障胶囊（ArmIo 把失败原因记在 ros_error）
+ExecStart=/bin/bash -lc 'source __ROS_SETUP__ && exec python3 -m grasp.web.server'
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

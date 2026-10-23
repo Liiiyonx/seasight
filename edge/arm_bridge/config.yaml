@@ -1,0 +1,146 @@
+# ============================================================
+# Oceanus arm bridge configuration
+# ============================================================
+# The bridge subscribes to robot/{device_id}/task and
+# robot/{device_id}/cmd, then translates arm driver results into
+# ACK / progress / telemetry messages.
+
+site_id: "lianjiang"
+device_id: "RBT-ARM-01"
+
+mqtt:
+  host: "localhost"
+  port: 1883
+  username: "robot_device"
+  password: "CHANGE_ME"
+  keepalive: 60
+  use_lwt: true
+
+driver:
+  # simulated = deterministic self test without hardware
+  # http      = generic HTTP adapter example for an arm HTTP SDK
+  backend: "simulated"
+
+  # ---- 真机：视觉闭环抓取（推荐，无预设动作）----
+  # 走 edge/grasp 子系统：YOLO 检出 → 像素↔世界坐标 → IK 现算 → 总线舵机。
+  # 与厂商节点共存（只发 /servo_controllers/... 话题，不抢串口），
+  # 舵机回读读厂商已发布的 servo_states 话题。
+  # 前置：edge/grasp 的 active 目录已就位模型（best.onnx）+ 完成 9 点标定，
+  #       否则 pick() 会明确报「未部署模型 / 未标定」而不是假装成功。
+  #       上真机前先跑 `python edge/grasp/tools/precheck.py` 把这四项前置验一遍。
+  # 训练作业台（采集/标注/训练/部署/标定）在 http://<IP>:8090。
+  #
+  # ★ 故意**不改** backend 默认值：main.py 的 --dry-run 自测与部分联测都按
+  #   simulated 跑，把默认切过去会把它们一起带到「需要 ROS」的路径上。
+  #   真机改为显式选择（systemd 部署脚本已按这个写法生成）：
+  #     python -m arm_bridge.main --config edge/arm_bridge/config.yaml \
+  #            --driver oceanus_vision
+  oceanus_vision:
+    config_path: null          # 默认读 edge/grasp/config.yaml
+    calibration_path: null     # 默认读 edge/grasp/calibration.json
+    mock: false                # true = 合成画面，不接 ROS
+    collected_weight: 0.05
+    review_result: "recheck"
+
+  simulated:
+    battery: 100
+    bins:
+      foam: 0.0
+      plastic: 0.0
+      mixed: 0.0
+    home:
+      lng: 119.6540
+      lat: 26.3870
+    collected_weight: 0.05
+    review_result: "confirmed"
+
+  http:
+    endpoint: "http://192.168.1.100:8080/arm"
+    method: "POST"
+    timeout: 10.0
+    headers: {}
+    battery: 100
+    bins:
+      foam: 0.0
+      plastic: 0.0
+      mixed: 0.0
+    home:
+      lng: 119.6540
+      lat: 26.3870
+
+  # New physical arms follow the same shape. Register the driver class in
+  # drivers.py, then select it here by name:
+  #
+  #   backend: "dobot_example"
+  #   dobot_example:
+  #     endpoint: "http://192.168.1.101:8080/dobot"
+  #     ...
+  #
+  # ---- 真机：走厂商 ROS 控制栈（推荐，2026-10-05 实测可用）----
+  #
+  # 厂商的 hiwonder_servo_manager 节点已持有 /dev/ttyS0，直连串口会与它
+  # 抢总线（半双工，必须独占）。本驱动复用 ros_control action，
+  # 与厂商程序**和平共存**，还能拿到有物理意义的关节角（弧度）。
+  #
+  # 前提：bridge 与机械臂在同一台树莓派上（或至少能访问其 ROS master）。
+  # 实测 joint_states：[joint1..joint5, r_joint]
+  #   positions = [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802] rad
+  #             = [0°, 30°, -78°, -100.8°, 0°, -102°]  ← 厂商标定的 home 位
+  #
+  # ros_arm_control:
+  #   arm_controller: "arm_controller"
+  #   gripper_controller: "gripper_controller"
+  #   # home_rad 为实测厂商标定值；pick_rad **必须示教确认**，
+  #   # 直接用 home 位当抓取位会抓空。
+  #   home_rad: [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802]
+  #   pick_rad: [0.0, 0.5236, -1.3614, -1.7593, 0.0, -1.7802]
+
+  # Hiwonder Raspberry Pi bus-servo arms use the vendor SDK on the Pi.
+  # ★ 直连串口**必须先停掉厂商节点**（它占着 /dev/ttyS0），否则抢不到总线。
+  #   sudo systemctl stop armpi_fpv_bringup
+  # 优先级：能用 ros_arm_control 就别用这条 —— 串口那条与厂商 GUI 互斥。
+  # pick_sequence positions are pre-taught servo positions (0..1000), not GPS
+  # coordinates. Record them with the vendor's teach-and-playback example.
+  # Alternatively record with tools/teach_hiwonder_sequence.py and set
+  # pick_sequence_file instead of the inline list below.
+  #
+  # Or keep vendor blocks separate with an explicit kind:
+  vendors:
+    dobot_example:
+      kind: "http"
+      endpoint: "http://192.168.1.101:8080/dobot"
+      method: "POST"
+      timeout: 10.0
+      headers: {}
+      battery: 100
+      bins:
+        foam: 0.0
+        plastic: 0.0
+        mixed: 0.0
+      home:
+        lng: 119.6540
+        lat: 26.3870
+
+    hiwonder_bus_servo:
+      kind: "hiwonder_bus_servo"
+      serial_port: "/dev/ttyAMA0"
+      baudrate: 1000000
+      timeout: 5.0
+      servo_ids: [1, 2, 3, 4]
+      home_positions: [[1, 500], [2, 500]]
+      # pick_sequence_file: "pick_sequence.json"
+      pick_sequence:
+        - duration: 1.0
+          positions: [[1, 650], [2, 500]]
+        - duration: 1.0
+          positions: [[1, 300], [2, 600]]
+      collected_weight: 0.0
+      review_result: "recheck"
+      battery: 100
+      bins:
+        foam: 0.0
+        plastic: 0.0
+        mixed: 0.0
+      home:
+        lng: 119.6540
+        lat: 26.3870

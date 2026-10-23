@@ -1,0 +1,292 @@
+{
+  "schema_version": "1.0",
+  "kind": "qualitative_channel_comparison",
+  "not_precision_recall": "本文件不含真实数据集的 precision/recall/F1。独立测试集清单 status=planned、真值标注为 0，这些指标的分母为零。它只回答『两条通道各自在什么条件下有效、在同一张图上各看到什么』。",
+  "generated_at": "2026-09-27T22:25:31+08:00",
+  "code_version": {
+    "source": "git",
+    "value": "1670ce9"
+  },
+  "channels": {
+    "cv": {
+      "backend": "cv",
+      "label": "传统视觉",
+      "engine": "OpenCV 背景建模 ∪ 颜色通道",
+      "min_confidence": 0.45,
+      "regime": "固定机位 + 连续帧（靠帧间差异）",
+      "strength": "零数据依赖、可解释、逐帧确定性",
+      "limitation": "需要连续帧建立背景模型；单张照片不在其适用范围内"
+    },
+    "world": {
+      "backend": "world",
+      "label": "开放词汇",
+      "engine": "YOLO-World v2（零样本）+ CLIP 文本编码器",
+      "min_confidence": 0.02,
+      "regime": "单帧即可（靠语义）",
+      "strength": "现场加词即可新增类别，无需采集、标注、重训",
+      "limitation": "依赖外观纹理；置信度尺度与 cv 不同，不可横向比较"
+    }
+  },
+  "regimes": {
+    "still_image": {
+      "title": "单张照片",
+      "note": "cv 通道在本组恒为 0：它是固定机位背景建模，单张照片没有可用的背景模型，这是适用范围之外，不是失效 —— 它在连续帧上正常工作（见 video_stream 组）。",
+      "images": [
+        {
+          "sample_id": "plastic-bottle",
+          "image": "demo/beach-mixed-debris-4k.webp",
+          "name": "beach-mixed-debris-4k.webp",
+          "width": 3840,
+          "height": 2560,
+          "cv": {
+            "detections": [],
+            "count": 0,
+            "max_confidence": 0.0,
+            "latency_ms": 315.09,
+            "status": "evaluated"
+          },
+          "world": {
+            "detections": [
+              {
+                "class": "plastic bottle",
+                "confidence": 0.194349,
+                "bbox": [
+                  388.988,
+                  2146.163,
+                  530.359,
+                  2388.476
+                ]
+              }
+            ],
+            "count": 1,
+            "max_confidence": 0.194349,
+            "prompt_classes": [
+              "plastic bottle"
+            ],
+            "conf": 0.06,
+            "imgsz": 1920,
+            "model": "yolov8s-worldv2.pt",
+            "source_file": "beach-mixed-debris-detections.json",
+            "status": "verified_sample"
+          }
+        },
+        {
+          "sample_id": "fishing-gear",
+          "image": "demo/fishing-net-4k.webp",
+          "name": "fishing-net-4k.webp",
+          "width": 3840,
+          "height": 2880,
+          "cv": {
+            "detections": [],
+            "count": 0,
+            "max_confidence": 0.0,
+            "latency_ms": 335.67,
+            "status": "evaluated"
+          },
+          "world": {
+            "detections": [
+              {
+                "class": "fishing gear",
+                "confidence": 0.065392,
+                "bbox": [
+                  1756.963,
+                  1555.425,
+                  2026.448,
+                  2000.468
+                ]
+              }
+            ],
+            "count": 1,
+            "max_confidence": 0.065392,
+            "prompt_classes": [
+              "fishing gear"
+            ],
+            "conf": 0.02,
+            "imgsz": 1920,
+            "model": "yolov8s-worldv2.pt",
+            "source_file": "fishing-net-detections.json",
+            "status": "verified_sample"
+          }
+        },
+        {
+          "sample_id": "discarded-shoes",
+          "image": "demo/midway-shoes-4k.webp",
+          "name": "midway-shoes-4k.webp",
+          "width": 3840,
+          "height": 2560,
+          "cv": {
+            "detections": [],
+            "count": 0,
+            "max_confidence": 0.0,
+            "latency_ms": 276.77,
+            "status": "evaluated"
+          },
+          "world": {
+            "detections": [
+              {
+                "class": "shoe",
+                "confidence": 0.212161,
+                "bbox": [
+                  2473.19,
+                  1477.729,
+                  3680.914,
+                  2557.747
+                ]
+              },
+              {
+                "class": "shoe",
+                "confidence": 0.127988,
+                "bbox": [
+                  3246.706,
+                  2002.808,
+                  3699.886,
+                  2390.559
+                ]
+              },
+              {
+                "class": "shoe",
+                "confidence": 0.097781,
+                "bbox": [
+                  1979.812,
+                  115.697,
+                  3334.394,
+                  1421.439
+                ]
+              },
+              {
+                "class": "shoe",
+                "confidence": 0.073317,
+                "bbox": [
+                  2653.542,
+                  1996.901,
+                  3687.336,
+                  2559.131
+                ]
+              },
+              {
+                "class": "shoe",
+                "confidence": 0.073223,
+                "bbox": [
+                  357.496,
+                  579.139,
+                  1460.677,
+                  1812.762
+                ]
+              },
+              {
+                "class": "shoe",
+                "confidence": 0.044612,
+                "bbox": [
+                  1528.683,
+                  1145.447,
+                  3142.605,
+                  2444.755
+                ]
+              }
+            ],
+            "count": 6,
+            "max_confidence": 0.212161,
+            "prompt_classes": [
+              "shoe"
+            ],
+            "conf": 0.035,
+            "imgsz": 1920,
+            "model": "yolov8s-worldv2.pt",
+            "source_file": "midway-shoes-detections.json",
+            "status": "verified_sample"
+          }
+        },
+        {
+          "sample_id": "polystyrene-cup",
+          "image": "demo/styrofoam-cup-4k.webp",
+          "name": "styrofoam-cup-4k.webp",
+          "width": 3840,
+          "height": 2876,
+          "cv": {
+            "detections": [],
+            "count": 0,
+            "max_confidence": 0.0,
+            "latency_ms": 307.59,
+            "status": "evaluated"
+          },
+          "world": {
+            "detections": [
+              {
+                "class": "polystyrene cup",
+                "confidence": 0.095801,
+                "bbox": [
+                  1428.767,
+                  1295.968,
+                  2554.326,
+                  2563.375
+                ]
+              }
+            ],
+            "count": 1,
+            "max_confidence": 0.095801,
+            "prompt_classes": [
+              "polystyrene cup"
+            ],
+            "conf": 0.06,
+            "imgsz": 1920,
+            "model": "yolov8s-worldv2.pt",
+            "source_file": "styrofoam-cup-detections.json",
+            "status": "verified_sample"
+          }
+        }
+      ]
+    },
+    "video_stream": {
+      "frames": 60,
+      "note": "合成海面序列，真值为生成器 3 个泡沫团的外接框（程序化）",
+      "evidence_level": "E1/E2",
+      "not_generalizable": "合成序列 + 程序化真值，证据等级 E1/E2。合成帧里的泡沫是绘制出来的圆，与真实海面目标的表观分布不同，命中率不得外推为真实海域表现。",
+      "cv": {
+        "detections_total": 173,
+        "frames_with_detection": 56,
+        "gt_targets_hit": 168,
+        "gt_targets_total": 180,
+        "gt_hit_rate": 0.9333,
+        "latency_ms": 4.31
+      },
+      "world": {
+        "detections_total": 0,
+        "frames_with_detection": 0,
+        "gt_targets_hit": 0,
+        "gt_targets_total": 180,
+        "latency_ms": 148.82,
+        "status": "evaluated",
+        "reason": null,
+        "threshold_probe": {
+          "probe_conf": 0.001,
+          "note": "诊断用：门限压到近乎为零再跑一次，用来区分『门限丢了框』与『模型没输出』。本结果不计入 detections_total。",
+          "available": true,
+          "frames": 3,
+          "raw": 0,
+          "kept": 0,
+          "dropped_low_conf": 0,
+          "top_confidence": 0.0,
+          "score_buckets": {
+            ">=0.1": 0,
+            ">=0.05": 0,
+            ">=0.02": 0,
+            ">=0.01": 0,
+            "total": 0
+          },
+          "class_top": null,
+          "class_counts": null,
+          "diagnosis": "模型对这批画面**原始输出为 0**（不是因为门限）：dropped_* 全为 0。调低 conf 也救不回来。"
+        },
+        "caveats": [
+          "world 通道在本组检出 0 条，且**不是被门限丢掉的**：门限压到 0.001 重跑同样 raw=0、dropped_* 全为 0。合成帧是程序化绘制的纯色圆盘（背景单色 + 3 个色块圆），缺少开放词汇零样本模型赖以判别的外观纹理，属于其输入分布之外。因此本组这 0 条**不能**读作'开放词汇通道无效'，它只说明**这批合成真值不适合用来考察该通道**。开放词汇通道的实际表现请看静态照片组（那里有真实纹理）。"
+        ]
+      }
+    }
+  },
+  "caveats": [
+    "两条通道的置信度尺度不同（cv 为 0.30~0.95 的伪置信度；world 低一个量级），分数不可横向比较，也不能放在一起排名。",
+    "本文件是定性对照，不含精度、召回或可用性结论；独立测试集仍为空。",
+    "video_stream 组的命中率是**合成数据口径（E1/E2）**，严禁外推为真实海域表现。",
+    "cv 通道的原始检出条数在短窗口上有约 ±2 的运行间波动（OpenCV 背景建模内部状态所致）；跨运行的条数差异在该粒度内不算发现。"
+  ]
+}

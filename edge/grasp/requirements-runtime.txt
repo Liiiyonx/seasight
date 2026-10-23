@@ -1,0 +1,17 @@
+# ============================================================
+# Oceanus 机械臂 · **自动抓取**运行时依赖（最小集）
+# ============================================================
+# 与同目录 requirements.txt 的区别：
+#   requirements.txt     —— 完整功能（含作业台 FastAPI、现场再训练 ultralytics）
+#   requirements-runtime.txt（本文件）—— 只要「识别 → 抓取 → 入槽」跑起来
+#
+# 为什么要单独列一份：树莓派上装 uvicorn / ultralytics 经常失败（老镜像
+# Python 3.6 装不了 fastapi>=0.110；ultralytics 在 ARM 上要拉一堆 torch 依赖）。
+# 那些失败**不该阻塞自动抓取** —— 推理走 ONNX + cv2.dnn，训练档只在作业台用。
+# 所以部署脚本先装本文件，装成功了再尝试完整 requirements.txt。
+
+numpy>=1.16
+PyYAML>=5.1
+# 树莓派优先用系统包：sudo apt install -y python3-opencv python3-numpy python3-yaml
+# 这里留着是为了 pip 兜底（OpenCV 4.x 需要 Pi 上能编/有 wheel）
+opencv-python>=4.5

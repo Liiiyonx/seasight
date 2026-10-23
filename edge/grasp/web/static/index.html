@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oceanus 机械臂训练作业台</title>
+<style>
+  /* 设计 token 与主平台（frontend/src/assets/main.css）保持一致：
+     浅色 iOS 风格 —— 系统蓝 #007aff、分组背景 #f2f2f7、白色圆角卡片。 */
+  :root {
+    color-scheme: light;
+
+    --c-primary: #007aff;
+    --c-primary-dim: #0066d6;
+    --grad-primary: linear-gradient(180deg, #1688ff 0%, #007aff 100%);
+
+    --c-danger: #ff3b30;
+    --c-warn: #ff9500;
+    --c-success: #34c759;
+
+    --bg-page: #f2f2f7;
+    --bg-panel: #ffffff;
+    --bg-panel-2: #f7f7fa;
+    --bg-hover: rgba(0, 0, 0, .045);
+    --bg-active: rgba(0, 122, 255, .1);
+
+    --text-main: #1c1c1e;
+    --text-sub: #636366;
+    --text-dim: #8e8e93;
+
+    --border: rgba(60, 60, 67, .16);
+    --border-bright: rgba(60, 60, 67, .28);
+    --separator: rgba(60, 60, 67, .12);
+    --panel-border: rgba(60, 60, 67, .12);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .035), 0 6px 20px rgba(0, 0, 0, .035);
+
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    --ease: cubic-bezier(.22, 1, .36, 1);
+    --dur: .2s;
+
+    /* 深色底衬（视频流 / 日志 / 帧缩略图）专用固定色：
+       这些面上的文字必须是固定浅色，不得用 --text-* 变量。 */
+    --stage-bg: #0b1f28;
+    --stage-text: #cfe7ee;
+    --stage-text-strong: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg-page);
+    color: var(--text-main);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(60, 60, 67, .24);
+    border: 2px solid transparent; border-radius: 999px; background-clip: padding-box;
+  }
+
+  /* ---------- 顶栏：与平台一致的玻璃拟态 + 品牌锁定 ---------- */
+  /* 品牌区与分区导航一起吸顶，玻璃背景与底部分隔线统一挂在 .topbar 上 */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255, 255, 255, .88);
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+    border-bottom: 1px solid var(--separator);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, .02);
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    min-height: 64px; padding: 8px 18px;
+  }
+  .brand-lockup { display: inline-flex; align-items: center; gap: 11px; min-width: 0; }
+  .brand-lockup__copy { display: flex; flex-direction: column; min-width: 0; }
+  .brand-lockup__title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .brand-lockup__cn {
+    color: var(--text-main); font-size: 18px; font-weight: 700;
+    letter-spacing: .2px; white-space: nowrap;
+  }
+  .brand-lockup__en {
+    color: var(--text-dim); font-size: 10px; font-weight: 700;
+    letter-spacing: 1.4px; line-height: 1; text-transform: uppercase; white-space: nowrap;
+  }
+  .brand-lockup__sub {
+    color: var(--text-dim); font-size: 11px; letter-spacing: .2px;
+    line-height: 1.35; white-space: nowrap;
+  }
+  .logo-mark {
+    display: block; flex: 0 0 auto;
+    filter: drop-shadow(0 5px 12px rgba(0, 92, 190, .2));
+  }
+
+  /* ---------- 状态徽标：与平台 .badge 同款（软色填充、无描边） ---------- */
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 26px; padding: 3px 11px; border: 0; border-radius: 999px;
+    background: rgba(142, 142, 147, .14); color: var(--text-sub);
+    font-size: 12px; font-weight: 500; line-height: 18px; white-space: nowrap;
+  }
+  .pill b { color: var(--text-main); font-weight: 600; }
+  .pill.ok { background: rgba(52, 199, 89, .14); color: var(--c-success); }
+  .pill.ok b { color: inherit; }
+  .pill.warn { background: rgba(255, 149, 0, .14); color: var(--c-warn); }
+  .pill.warn b { color: inherit; }
+  .pill.bad { background: rgba(255, 59, 48, .13); color: var(--c-danger); }
+  .pill.bad b { color: inherit; }
+
+  /* ---------- 页面骨架：分区视图，一次只显示一个 ---------- */
+  main { padding: 16px; }
+  .view { display: none; }
+  .view.is-active { display: grid; gap: 16px; align-items: start; }
+  .view--split { grid-template-columns: minmax(400px, 1.25fr) minmax(340px, 1fr); }
+  .view--stack { grid-template-columns: minmax(0, 1fr); max-width: 960px; margin-inline: auto; }
+  .view > .card { margin-bottom: 0; }
+  @media (max-width: 1080px) { .view--split { grid-template-columns: 1fr; } }
+
+  /* ---------- 分区导航（按钮跳转，页面不再拉长） ---------- */
+  .tabs {
+    display: flex; gap: 8px; padding: 0 18px 10px;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 34px; padding: 6px 14px;
+    border: 0; border-radius: var(--radius);
+    background: var(--bg-panel-2); color: var(--text-sub);
+    font-size: 13px; font-weight: 500; line-height: 1.2; white-space: nowrap; cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .tab:hover { background: var(--bg-hover); color: var(--text-main); }
+  .tab.is-active, .tab.is-active:hover { background: var(--bg-active); color: var(--c-primary); }
+  .tab i {
+    font-style: normal; font-size: 11px; font-weight: 600;
+    color: var(--text-dim); font-variant-numeric: tabular-nums;
+  }
+  .tab.is-active i { color: var(--c-primary); }
+
+  /* ---------- 面板：与平台 .panel 同款（白卡 + 标题分隔线） ---------- */
+  .card {
+    background: var(--bg-panel); border: 1px solid var(--panel-border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+    padding: 16px; margin-bottom: 16px;
+  }
+  .card > h2 {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 48px; margin: -16px -16px 14px; padding: 12px 16px;
+    border-bottom: 1px solid var(--separator);
+    color: var(--text-main); font-size: 15px; font-weight: 600; letter-spacing: 0;
+  }
+  .card > p.hint { margin: 0 0 12px; color: var(--text-sub); font-size: 12px; line-height: 1.6; }
+  .card > p.hint strong { color: var(--text-main); font-weight: 600; }
+
+  /* ---------- 实时画面（深色底衬：文字一律固定浅色） ---------- */
+  .stream-wrap {
+    position: relative; background: var(--stage-bg);
+    border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3;
+  }
+  .stream-wrap img { width: 100%; height: 100%; display: block; object-fit: contain; }
+  .stream-tag {
+    position: absolute; left: 10px; top: 10px; padding: 3px 9px; border-radius: 999px;
+    background: rgba(11, 31, 40, .72); color: var(--stage-text-strong);
+    font-size: 12px; letter-spacing: .3px;
+  }
+
+  /* ---------- 行 / 按钮 / 表单 ---------- */
+  /* ---------- 手动控制页 ---------- */
+/* 最前端关节（腕转）专用块：操作员用它对准方向，所以要做得比别处显眼 */
+.mc-front { border-color: var(--c-primary); }
+.mc-jtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.mc-jtab { min-width: 86px; font-size: 12px; padding: 8px 10px; line-height: 1.35; }
+.mc-jtab.is-active { border-color: var(--c-primary); background: var(--c-primary);
+  color: #ffffff; }
+.mc-jtab small { display: block; font-size: 10px; opacity: .8; font-weight: 400; }
+
+.mc-big { display: flex; align-items: center; justify-content: center;
+  gap: 14px; margin: 6px 0 12px; flex-wrap: wrap; }
+.mc-bigbtn { font-size: 15px; padding: 14px 20px; min-width: 118px; font-weight: 600; }
+.mc-bigbtn:active:not(:disabled) { transform: translateY(1px); }
+.mc-bigval { display: flex; flex-direction: column; align-items: center;
+  min-width: 128px; padding: 4px 10px; }
+.mc-biglabel { font-size: 11px; color: var(--text-sub); }
+.mc-bignum { font-size: 30px; font-weight: 700; line-height: 1.15;
+  color: var(--c-primary); font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mc-bigsub { font-size: 11px; color: var(--text-sub); }
+.mc-range { width: 100%; max-width: 460px; display: block; margin: 0 auto 4px;
+  accent-color: var(--c-primary); height: 22px; }
+
+.mc-keys { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg-sub); }
+.mc-krow { display: flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--text-sub); }
+.mc-krow kbd { display: inline-block; min-width: 24px; padding: 3px 7px;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  background: var(--bg-card); color: var(--text-main);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  text-align: center; }
+.mc-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mc-preset { display: inline-flex; align-items: stretch; }
+.mc-preset > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.mc-preset > button.mc-del { border-top-left-radius: 0; border-bottom-left-radius: 0;
+  border-left: none; padding-left: 8px; padding-right: 8px; color: var(--c-danger); }
+.mc-preset > button.mc-boot { border-radius: 0; border-left: none;
+  padding-left: 8px; padding-right: 8px; color: var(--text-sub); }
+.mc-preset > button.mc-boot:hover { color: var(--c-primary); }
+.mc-preset > button.is-boot { border-color: var(--c-primary); color: var(--c-primary);
+  font-weight: 600; }
+.mc-target-off { color: var(--c-warn); }
+.key-hint-on { color: var(--c-primary); font-weight: 600; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }  .row + .row { margin-top: 10px; }
+  button {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 36px; padding: 7px 14px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-panel); color: var(--text-main);
+    font-size: 13px; font-weight: 500; line-height: 1.2; white-space: nowrap; cursor: pointer;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+      color var(--dur) var(--ease), transform .12s var(--ease);
+  }
+  button:hover:not(:disabled) { border-color: var(--border-bright); background: var(--bg-hover); }
+  button:active:not(:disabled) { transform: scale(.98); }
+  button:disabled { opacity: .42; cursor: not-allowed; }
+  button.primary { border-color: transparent; background: var(--c-primary); color: #ffffff; }
+  button.primary:hover:not(:disabled) { border-color: transparent; background: var(--c-primary-dim); color: #ffffff; }
+  button.danger { border-color: rgba(255, 59, 48, .4); color: var(--c-danger); }
+  button.danger:hover:not(:disabled) { border-color: var(--c-danger); background: rgba(255, 59, 48, .08); color: var(--c-danger); }
+  input, select {
+    min-height: 36px; padding: 7px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+    background: var(--bg-panel); color: var(--text-main); font-size: 13px;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  input:focus, select:focus { border-color: var(--c-primary); box-shadow: 0 0 0 3px rgba(0, 122, 255, .12); }
+  input[type="number"] { width: 92px; }
+  input[type="checkbox"] {
+    min-height: 0; padding: 0; border: 0; background: none;
+    accent-color: var(--c-primary);
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(0, 122, 255, .22); outline-offset: 2px;
+  }
+  label.fld { display: inline-flex; align-items: center; gap: 6px; color: var(--text-sub); font-size: 12px; }
+  ::placeholder { color: var(--text-dim); }
+
+  /* ---------- 会话清单（训练集口径：多选 + 就地显示可用样本数） ---------- */
+  /* 用复选框清单而不是 <select multiple>：「不勾 = 全部会话」这个语义在复选框上
+     是显式的（多选下拉里"空选择"是歧义），而且每项能就地写出帧数/可用样本数。 */
+  .sesslist {
+    display: grid; gap: 4px; padding: 8px 10px; max-height: 200px; overflow: auto;
+    border: 1px solid var(--panel-border); border-radius: var(--radius);
+    background: var(--bg-panel-2);
+  }
+  .sesslist label {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    color: var(--text-main); font-size: 12px;
+  }
+  .sesslist label strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+  .sesslist label span { margin-left: auto; color: var(--text-sub); font-size: 11px; white-space: nowrap; }
+  /* ---------- 扫描表（数值矩阵用真表格比 div 网格好读） ---------- */
+  .tbl {
+    width: 100%; border-collapse: collapse; margin-top: 8px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  }
+  .tbl th, .tbl td { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--separator); }
+  .tbl th:first-child, .tbl td:first-child { text-align: left; }
+  .tbl tr.best { background: var(--bg-active); color: var(--c-primary); font-weight: 600; }
+  .tbl tr.cur td:first-child::after { content: " ·当前"; color: var(--c-warn); font-weight: 600; }
+
+  /* ---------- 指标 / 舵机 ---------- */
+  .stat { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .stat div {
+    padding: 10px 12px; border: 1px solid var(--panel-border);
+    border-radius: var(--radius); background: var(--bg-panel-2);
+  }
+  .stat div span { display: block; color: var(--text-sub); font-size: 11px; }
+  .stat div b { font-size: 13px; font-weight: 600; }
+  .servos { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .servo {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border: 1px solid var(--panel-border); border-radius: var(--radius);
+    background: var(--bg-panel-2); font-size: 12px;
+  }
+  .servo b { color: var(--text-main); }
+  .servo code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; color: var(--c-primary); }
+
+  /* ---------- 进度条 ---------- */
+  .bar { height: 8px; border-radius: 999px; background: rgba(60, 60, 67, .1); overflow: hidden; margin: 8px 0 4px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--grad-primary); transition: width .3s var(--ease); }
+
+  /* ---------- 日志（深色底衬：固定浅色文字） ---------- */
+  pre.log {
+    margin: 8px 0 0; max-height: 190px; overflow: auto; padding: 10px 12px;
+    background: var(--stage-bg); color: var(--stage-text); border-radius: var(--radius);
+    font: 12px/1.65 "SF Mono", ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap;
+  }
+
+  /* ---------- 帧列表（缩略图深色底衬） ---------- */
+  .frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin-top: 10px; }
+  .frames button {
+    padding: 0; overflow: hidden; border-radius: 8px; height: 66px;
+    border: 2px solid transparent; background: var(--stage-bg);
+  }
+  .frames button:hover:not(:disabled) { background: var(--stage-bg); border-color: var(--border-bright); }
+  .frames button.sel, .frames button.sel:hover:not(:disabled) { border-color: var(--c-primary); }
+  .frames img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* 帧列表一次只渲染前 N 帧，其余折叠到「显示更多」——避免整页被撑爆 */
+  .frames button.frames__more {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; height: 66px; padding: 0 6px;
+    border: 1px dashed var(--border-bright); border-radius: 8px;
+    background: var(--bg-panel-2); color: var(--text-sub);
+    font-size: 11px; line-height: 1.35;
+  }
+  .frames button.frames__more:hover:not(:disabled) {
+    background: var(--bg-hover); border-color: var(--c-primary); color: var(--c-primary);
+  }
+  .frames button.frames__more span { color: var(--text-dim); font-size: 10px; }
+  .frames button.frames__more:hover:not(:disabled) span { color: var(--c-primary); }
+  .frames .empty { grid-column: 1 / -1; }
+
+  /* ---------- 标注台 ---------- */
+  .editor { margin-top: 12px; }
+  .editor-stage {
+    position: relative; user-select: none; cursor: crosshair;
+    border-radius: 12px; overflow: hidden;
+  }
+  .editor-stage img { width: 100%; display: block; }
+  /* 还没选帧时 img 没 src，不隐藏的话会显示一个破图图标 + alt 文字 */
+  .editor-stage img:not([src]) { display: none; }
+  .box {
+    position: absolute; border: 2px solid var(--c-primary); background: rgba(0, 122, 255, .12);
+    font-size: 11px; color: var(--stage-text-strong);
+  }
+  .box.buoy { border-color: #9aa7ad; background: rgba(154, 167, 173, .16); }
+  .box em {
+    position: absolute; left: -2px; top: -18px; padding: 1px 6px; border-radius: 4px;
+    background: var(--c-primary-dim); color: var(--stage-text-strong); font-style: normal;
+  }
+  .box.buoy em { background: #6d7b82; }
+
+  /* ---------- 版本列表 ---------- */
+  .versions { margin-top: 10px; display: grid; gap: 6px; }
+  .versions div {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 11px; border: 1px solid var(--panel-border);
+    border-radius: var(--radius); background: var(--bg-panel-2); font-size: 12px;
+  }
+  .versions div.cur { border-color: var(--c-primary); background: var(--bg-active); }
+
+  /* ---------- 文本辅助 ---------- */
+  .muted { color: var(--text-sub); font-size: 12px; }
+
+  /* ---------- 空状态 ---------- */
+  .empty {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 64px; padding: 18px 12px;
+    color: var(--text-dim); font-size: 12px; text-align: center;
+  }
+  /* 空日志：深色底衬上给一句固定浅色提示（:empty 时显示） */
+  .log:empty::before {
+    content: attr(data-empty);
+    color: rgba(255, 255, 255, .42);
+  }
+  code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; color: var(--c-primary); }
+  .kv { display: grid; grid-template-columns: 84px 1fr; gap: 8px; font-size: 12px; }
+  .kv span { color: var(--text-sub); }
+  .kv b { color: var(--text-main); font-weight: 600; }
+
+  /* 窄屏：收敛品牌副标/英文名；状态胶囊改为横向滚动，不再换行挤压品牌 */
+  @media (max-width: 720px) {
+    header { padding: 8px 12px; gap: 10px; }
+    .brand-lockup { flex: 0 0 auto; }
+    .brand-lockup__en, .brand-lockup__sub { display: none; }
+    .pills {
+      flex: 1 1 auto; min-width: 0;
+      flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+      justify-content: flex-end; justify-content: safe flex-end;
+      scrollbar-width: none;
+    }
+    .pills::-webkit-scrollbar { display: none; }
+    .pill { flex: 0 0 auto; }
+    .tabs { padding: 0 12px 10px; }
+    main { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+<header>
+  <div class="brand-lockup">
+    <svg class="logo-mark" viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">
+      <defs>
+        <linearGradient id="oceanus-logo-bg" x1="7" y1="4" x2="41" y2="44" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#0877e8" />
+          <stop offset="1" stop-color="#00a6c8" />
+        </linearGradient>
+        <linearGradient id="oceanus-logo-lens" x1="30" y1="15" x2="39" y2="25" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#e8fdff" />
+          <stop offset="0.48" stop-color="#71ebff" />
+          <stop offset="1" stop-color="#22b9dc" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#oceanus-logo-bg)" />
+      <rect x="2.75" y="2.75" width="42.5" height="42.5" rx="12.25" fill="none"
+            stroke="#ffffff" stroke-opacity="0.2" stroke-width="1.5" />
+      <g transform="rotate(-20 24 20)">
+        <rect x="8.6" y="17.1" width="5.8" height="5.8" rx="2.9" fill="#ffffff" opacity="0.8" />
+        <rect x="12" y="15.3" width="22.6" height="9.4" rx="4.7" fill="#ffffff" />
+        <rect x="16.8" y="15.3" width="4.2" height="9.4" fill="#b9effb" opacity="0.92" />
+        <rect x="27.1" y="14.4" width="2.8" height="11.2" rx="1.4" fill="#d6f8ff" opacity="0.96" />
+        <circle cx="34.5" cy="20" r="6.3" fill="#07324f" stroke="#ffffff" stroke-width="2.55" />
+        <circle cx="34.5" cy="20" r="3.55" fill="url(#oceanus-logo-lens)" />
+        <path d="M32.7 18.2c0.8-0.9 1.9-1.35 3.1-1.2" fill="none"
+              stroke="#ffffff" stroke-width="1.25" stroke-linecap="round" opacity="0.9" />
+      </g>
+      <path d="M7.5 32.2c2.75-2.15 5.5-2.15 8.25 0s5.5 2.15 8.25 0 5.5-2.15 8.25 0 5.5 2.15 8.25 0"
+            fill="none" stroke="#ffffff" stroke-width="2.15" stroke-linecap="round" />
+      <path d="M13.5 38.2c1.75-1.45 3.5-1.45 5.25 0s3.5 1.45 5.25 0 3.5-1.45 5.25 0 3.5 1.45 5.25 0"
+            fill="none" stroke="#c9f8ff" stroke-opacity="0.72" stroke-width="1.7" stroke-linecap="round" />
+    </svg>
+    <div class="brand-lockup__copy">
+      <div class="brand-lockup__title">
+        <span class="brand-lockup__cn">探海灵眸</span>
+        <span class="brand-lockup__en">Oceanus</span>
+      </div>
+      <span class="brand-lockup__sub">机械臂现场再训练作业台 · 全自动拾取</span>
+    </div>
+  </div>
+  <div class="pills" id="pills"></div>
+</header>
+<nav class="tabs" id="tabs" aria-label="作业台分区">
+  <button class="tab is-active" data-view="live" onclick="showView('live')">实时监控</button>
+  <button class="tab" data-view="collect" onclick="showView('collect')"><i>1</i>数据采集</button>
+  <button class="tab" data-view="label" onclick="showView('label')"><i>2</i>标注台</button>
+  <button class="tab" data-view="train" onclick="showView('train')"><i>3</i>训练任务</button>
+  <button class="tab" data-view="deploy" onclick="showView('deploy')"><i>4</i>部署与回滚</button>
+  <button class="tab" data-view="calib" onclick="showView('calib')"><i>5</i>标定与点动</button>
+  <button class="tab" data-view="manual" onclick="showView('manual')"><i>7</i>手动控制</button>
+  <button class="tab" data-view="grasp" onclick="showView('grasp')"><i>6</i>抓取作业</button>
+</nav>
+</div>
+
+<main>
+  <section class="view view--split is-active" id="view-live" aria-label="实时监控">
+    <div class="card">
+      <h2>实时画面 <span class="muted" id="dets-age">—</span></h2>
+      <p class="hint">只有目标类（塑料袋）会被框出并标出抓取点十字；画面里的彩色浮标<strong>不会产生任何检出</strong>，也就不会进入抓取候选。若模型输出了非目标类（mock 模式的合成检测会有），才画成灰框并标「忽略」。</p>
+      <div class="stream-wrap">
+        <img id="stream" src="/stream" alt="实时画面" />
+        <div class="stream-tag" id="phase-tag">相位 idle</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>平台派单上下文</h2>
+      <p class="hint">只读订阅 <code>robot/{device_id}/task</code>，平台侧契约不改。</p>
+      <div class="kv" id="task-kv"></div>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-collect" aria-label="数据采集">
+    <div class="card">
+      <h2>1 · 数据采集</h2>
+      <p class="hint">连拍若干帧，并让机械臂在几个观测姿态间轮换以增广视角。采集时请把彩色浮标一起放进画面 —— 抗干扰样本就来自这里。</p>
+      <div class="row">
+        <label class="fld" for="cap-frames">帧数 <input type="number" id="cap-frames" value="200" min="10" max="2000" /></label>
+        <label class="fld" for="cap-tag">标签 <input id="cap-tag" placeholder="可选，如 bag1" /></label>
+        <label class="fld" for="cap-augment"><input type="checkbox" id="cap-augment" checked /> 姿态增广</label>
+        <button class="primary" onclick="startCapture()">开始采集</button>
+      </div>
+      <div class="bar"><i id="cap-bar"></i></div>
+      <div class="muted" id="cap-note">未开始</div>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-label" aria-label="标注台">
+    <div class="card">
+      <h2>2 · 标注台</h2>
+      <p class="hint">选一帧，先「预标注」拿模型建议，再拖动鼠标补框/修框；类别可选，浮标请标成 buoy（负类）。</p>
+      <div class="row">
+        <label class="fld" for="lab-session">会话 <select id="lab-session" onchange="onSessionChange()"></select></label>
+        <button onclick="loadFrames()">刷新帧列表</button>
+        <button onclick="loadSessions()">刷新会话</button>
+        <label class="fld" for="lab-cls">新框类别
+          <select id="lab-cls"><option>plastic_bag</option><option>buoy</option></select>
+        </label>
+        <button onclick="prelabel()">预标注</button>
+        <button class="primary" onclick="saveLabel()">保存标注</button>
+      </div>
+      <div class="row">
+        <label class="fld" for="lab-bg-note">背景说明
+          <input id="lab-bg-note" placeholder="如 空池 / 臂体入画" />
+        </label>
+        <button id="lab-bg-btn" onclick="toggleBackground()" disabled>标为背景负样本</button>
+        <span class="muted" id="lab-bg-state" aria-live="polite">未选择会话</span>
+      </div>
+      <p class="hint">空池、臂体/线缆入画、手入画这类帧按规程「整张不标」；但**不标就等于没标**
+        —— 组装训练集只收「标注非空」的帧，它们会被当成"尚未标注"整组丢掉。所以整组标成
+        **背景负样本**，它们才会以「有图无标签的背景帧」进训练（决定精确率的那批数据）。</p>
+      <div class="frames" id="frame-list"></div>
+      <div class="editor">
+        <div class="editor-stage" id="stage">
+          <img id="stage-img" alt="待标注帧" />
+        </div>
+        <div class="muted" id="lab-note" style="margin-top:6px" aria-live="polite">未选择帧 · 点上方缩略图开始标注</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-train" aria-label="训练任务">
+    <div class="card">
+      <h2>3 · 训练任务</h2>
+      <p class="hint">三档可选：免训练校准（秒级，演示日兜底）／Pi 本地微调／局域网协同。推理不依赖训练栈。<strong>勾选要特化的采集组</strong>（不勾 = 全部会话，会把历史会话比如早期合成帧一起拉进来稀释）。现场按组采集时请勾「整组切分」。</p>
+      <div class="row">
+        <label class="fld" for="train-tier">档位 <select id="train-tier"></select></label>
+        <button onclick="selectAllSessions()">全选会话</button>
+        <button onclick="clearSessionSelection()">清空勾选</button>
+        <button onclick="loadSessions()">刷新会话</button>
+        <button class="primary" onclick="startTrain()">开始训练</button>
+        <button onclick="evalCurrent()">评估当前模型</button>
+      </div>
+      <div class="muted">训练会话<span class="muted">（不勾 = 全部会话；括号内是「可用样本数」，只有标注非空的帧、或整组标了背景的帧才算）</span></div>
+      <div class="sesslist" id="train-sessions"><div class="empty">还没有采集会话 · 先去「1 数据采集」采一组</div></div>
+      <div class="row">
+        <label class="fld" for="train-group"><input type="checkbox" id="train-group" onchange="renderSessionState()" /> 按采集组整组切分 train/val</label>
+        <label class="fld" for="train-mix">混采底料 yaml
+          <input id="train-mix" placeholder="如 edge/grasp/data/public_taco_plastic/data.yaml（逗号分隔）" style="width:min(340px,52vw)" />
+        </label>
+      </div>
+      <div class="muted" id="train-split-hint" aria-live="polite"></div>
+      <div class="muted" id="train-spec" aria-live="polite">本次口径：未开始</div>
+      <div class="bar"><i id="train-bar"></i></div>
+      <div class="muted" id="train-note">未开始</div>
+      <pre class="log" id="train-log" data-empty="暂无日志 · 开始训练后在此实时输出"></pre>
+    </div>
+
+    <div class="card">
+      <h2>场景特化（演示用）</h2>
+      <p class="hint">免训练、秒级：在<strong>当前已标注的帧</strong>上扫置信度阈值，并把所有标注框的并集写成 ROI（中心落在 ROI 外的检出不算抓取候选）。固定背景 + 固定光照 + 物体位置固定的场景里，ROI 比调阈值有效得多。也可以手动填下面的值，保存即生效。</p>
+      <div class="row">
+        <button class="primary" onclick="sceneCalibrate()">一键场景校准</button>
+        <button onclick="loadTuning()">读取当前调参</button>
+      </div>
+      <div class="muted" id="tuning-note" aria-live="polite">未读取</div>
+      <div class="row">
+        <label class="fld" for="tune-conf">置信度阈值 <input type="number" id="tune-conf" min="0" max="1" step="0.05" /></label>
+        <label class="fld" for="tune-iou">NMS IoU <input type="number" id="tune-iou" min="0" max="1" step="0.05" /></label>
+      </div>
+      <div class="row">
+        <label class="fld" for="tune-x">ROI x <input type="number" id="tune-x" min="0" max="1" step="0.01" /></label>
+        <label class="fld" for="tune-y">y <input type="number" id="tune-y" min="0" max="1" step="0.01" /></label>
+        <label class="fld" for="tune-w">w <input type="number" id="tune-w" min="0" max="1" step="0.01" /></label>
+        <label class="fld" for="tune-h">h <input type="number" id="tune-h" min="0" max="1" step="0.01" /></label>
+      </div>
+      <div class="row">
+        <button class="primary" onclick="saveTuning()">保存调参</button>
+        <button class="danger" onclick="clearTuningRoi()">取消 ROI</button>
+      </div>
+      <div class="muted" id="tune-sweep">—</div>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-deploy" aria-label="部署与回滚">
+    <div class="card">
+      <h2>4 · 部署与回滚</h2>
+      <p class="hint">部署前跑留出集评估，不达标不放行；权重按版本落盘，一条命令回到上一版。在笔记本上训练好的权重，把产物路径填进来就能登记并部署。</p>
+      <p class="hint"><strong>两个口径不是一回事</strong>：「评估当前模型」走 ultralytics 自带推理，给的是 mAP 与门禁依据；「部署链路扫描」走现场真正跑的 cv2.dnn 那条路，只给 P/R —— 两者前后处理不同，别拿前者的数字当部署结论。</p>
+      <div class="row">
+        <label class="fld" for="dep-gate">mAP50 门禁 <input type="number" id="dep-gate" value="0.5" min="0" max="1" step="0.05" /></label>
+        <label class="fld" for="dep-prec">精确率门禁 <input type="number" id="dep-prec" min="0" max="1" step="0.05" placeholder="不卡" /></label>
+        <button class="primary" onclick="doDeploy()">部署当前模型</button>
+        <button onclick="doRollback()">回滚上一版</button>
+        <button onclick="loadVersions()">刷新版本</button>
+      </div>
+      <div class="row">
+        <label class="fld" for="dep-src">训练产物路径
+          <input id="dep-src" placeholder="runs/xxx/weights/best.onnx" style="width:min(300px,55vw)" />
+        </label>
+        <button onclick="deployFromPath()">登记并部署</button>
+      </div>
+      <div class="muted" id="dep-note" aria-live="polite">—</div>
+      <div class="versions" id="versions"></div>
+
+      <h2 style="margin-top:16px">部署链路扫描（cv2.dnn）</h2>
+      <p class="hint">在组装好的留出集上扫置信度阈值，给出真机上线那条推理链的 P/R/F1 与误检归因（落在其他类物体上 vs 纯背景）。
+        训练产物还没部署时也能先扫它的 ONNX —— 先看指标再决定要不要切 active。</p>
+      <div class="row">
+        <label class="fld" for="sweep-model">模型路径
+          <input id="sweep-model" placeholder="留空 = active 里那份 best.onnx" style="width:min(320px,52vw)" />
+        </label>
+        <label class="fld" for="sweep-split">划分 <input id="sweep-split" value="val" style="width:72px" /></label>
+        <button class="primary" onclick="runSweep()">开始扫描</button>
+        <button onclick="loadSweep()">读上次结果</button>
+      </div>
+      <div class="bar"><i id="sweep-bar"></i></div>
+      <div class="muted" id="sweep-note" aria-live="polite">未扫描</div>
+      <div id="sweep-table"></div>
+      <pre class="log" id="sweep-log" data-empty="暂无日志 · 扫描后在此实时输出"></pre>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-calib" aria-label="标定与手动点动">
+    <div class="card">
+      <h2>5 · 9 点标定</h2>
+      <p class="hint">固定观测姿态下采集。开始后请依次把塑料袋放到页面提示的网格点上；某点未检出会自动跳过。标定只做粗定位，精度由视觉伺服闭环逐帧吸收。</p>
+      <div class="row">
+        <label class="fld" for="cal-n">网格 <input type="number" id="cal-n" value="3" min="2" max="5" /></label>
+        <label class="fld" for="cal-span">半跨度(m) <input type="number" id="cal-span" value="0.10" min="0.02" max="0.4" step="0.01" /></label>
+        <button class="primary" onclick="startCalibrate()">开始标定</button>
+        <button onclick="api('/api/calibrate/save').then(()=>toast('标定已保存'))">保存标定</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="fld" for="cal-plane">水面高度 z(m) <input type="number" id="cal-plane" step="0.005" /></label>
+        <button onclick="savePlaneZ()">保存水面高度</button>
+        <span class="muted">标定只解出 (x, y)；<b>z 要单独给</b>。船上甲板高于水面 → 填负数（甲板高出水面 8cm 就填 -0.08），填错爪子压不到袋子。</span>
+      </div>
+      <div class="bar"><i id="cal-bar"></i></div>
+      <div class="muted" id="cal-note" aria-live="polite">—</div>
+    </div>
+
+    <div class="card">
+      <h2>手动点动</h2>
+      <p class="hint">调试与标定用。真机上所有下发都走同一份 ROS 舵机话题，与厂商节点共存。</p>
+      <div class="servos" id="servos"></div>
+      <div class="row" style="margin-top:10px">
+        <label class="fld" for="jog-id">舵机 <input type="number" id="jog-id" value="1" min="1" max="6" /></label>
+        <label class="fld" for="jog-pos">脉宽 <input type="number" id="jog-pos" value="500" min="0" max="1000" /></label>
+        <button onclick="jog()">下发</button>
+        <button onclick="api('/api/gripper',{action:'open'})">夹爪张开</button>
+        <button onclick="api('/api/gripper',{action:'close'})">夹爪自适应闭合</button>
+        <button onclick="api('/api/home')">回待命位</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>放置点（料槽）</h2>
+      <p class="hint">
+        抓取闭环的最后一步：把袋子放进臂座旁边的料槽。抓取点每帧由视觉现算，
+        <b>放置点是固定工位，示教一次即可</b>。示教方法：用上面的「手动点动」把臂摆到槽口正上方
+        → 点「用当前姿态作放置点」。也可以直接填工作平面坐标（m，标定坐标系）。
+        没设放置点时抓取会直接拒绝开工 —— 夹起来没地方放比不抓更糟。
+      </p>
+      <div class="row">
+        <label class="fld" for="place-x">X(m) <input type="number" id="place-x" step="0.005" /></label>
+        <label class="fld" for="place-y">Y(m) <input type="number" id="place-y" step="0.005" /></label>
+        <button onclick="savePlaceCoord()">按坐标保存</button>
+        <button class="primary" onclick="teachPlacePose()">用当前姿态作放置点</button>
+        <button class="danger" onclick="clearPlace()">清除</button>
+      </div>
+      <div class="muted" id="place-state">—</div>
+      <div class="muted" id="place-note" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="view view--split" id="view-manual" aria-label="手动控制">
+    <div class="card mc-front">
+      <h2>骨架关节 · id3 / id4 / id5 / id6 <span class="muted">第三个关节 = J3（id3，升降大臂）</span></h2>
+      <p class="hint">
+        这四个是逆运动学关节，<b>单独改一个会改变夹爪位置</b>（不像腕转只转向）。
+        想按坐标精确移动请用下面的「位置控制」；这里的用途是手动微调、以及看每个关节实际走到哪。
+        <b>第三个关节 = J3（id3）</b>；下方行程都是在这台机器上实测出来的，取的是「舵机跟得准」的内段。
+      </p>
+      <div class="mc-jtabs" id="mc-jtabs"></div>
+      <div class="mc-big">
+        <button class="mc-bigbtn" onclick="jointStep(-1)">◀ 脉宽 −</button>
+        <div class="mc-bigval">
+          <span class="mc-biglabel" id="mc-joint-label">J3 · id3</span>
+          <output class="mc-bignum" id="mc-joint-val">—</output>
+          <span class="mc-bigsub" id="mc-joint-sub">实测区间 —</span>
+        </div>
+        <button class="mc-bigbtn" onclick="jointStep(1)">脉宽 + ▶</button>
+      </div>
+      <input type="range" id="mc-joint-range" class="mc-range" min="0" max="1000" step="1"
+             value="500" oninput="jointSlider(this.value)" onchange="jointSlider(this.value, true)" />
+      <div class="row" style="justify-content:center;margin-top:6px">
+        <label class="fld" for="mc-joint-step">每步脉宽 <input type="number" id="mc-joint-step" value="20" min="1" max="200" step="1" /></label>
+        <button onclick="jointCenter()">回该关节中点</button>
+        <button onclick="doHome()">回待命位（整体）</button>
+      </div>
+      <div class="muted" id="mc-joint-note">—</div>
+    </div>
+
+    <div class="card mc-front">
+      <h2>最前端关节 · 腕部旋转 <span class="muted">id2 — 决定夹爪朝哪边</span></h2>
+      <p class="hint">
+        这是臂尖上、紧挨夹爪的那个关节（末端链：<b>id2 腕转 → id1 夹爪</b>）。
+        它转动会让<b>夹爪与相机一起转</b>，用来对准目标的方向 —— 想从侧面夹、或者把相机转向另一边看，就调它。
+      </p>
+      <div class="mc-big">
+        <button class="mc-bigbtn" onclick="wristStep(-1)" title="逆时针转（脉宽减小）">◀ 逆时针</button>
+        <div class="mc-bigval">
+          <span class="mc-biglabel">当前脉宽</span>
+          <output class="mc-bignum" id="mc-front-val">—</output>
+          <span class="mc-bigsub" id="mc-front-sub">中位 500</span>
+        </div>
+        <button class="mc-bigbtn" onclick="wristStep(1)" title="顺时针转（脉宽增大）">顺时针 ▶</button>
+      </div>
+      <input type="range" id="mc-front-range" class="mc-range" min="300" max="700" step="1"
+             value="500" oninput="wristSlider(this.value)" onchange="wristSlider(this.value, true)" />
+      <div class="row" style="justify-content:center;margin-top:6px">
+        <label class="fld" for="mc-front-step">每步脉宽 <input type="number" id="mc-front-step" value="20" min="1" max="200" step="1" /></label>
+        <button onclick="wristSet(500)">回中位 500</button>
+        <button onclick="saveFrontPreset()">把当前姿态存为预设</button>
+      </div>
+      <div class="muted" id="mc-front-note">行程 300~700 为实测安全区（绝对值越大越朝一侧；500 为中位）。</div>
+    </div>
+
+    <div class="card">
+      <h2>安全 <span class="muted">先看这段</span></h2>
+      <p class="hint">
+        <b>「软停止」不是物理急停</b>：厂商的 ROS 消息集里只有 <code>MultiRawIdPosDur</code>，
+        没有卸力/急停消息。软停止做的是「中止作业 + 把 6 个舵机锁在当前回读位置」，
+        机械臂会停在原地但<b>仍然带电、仍有保持力矩</b>。真急停只能断电或拍下电源。
+      </p>
+      <div class="row">
+        <button class="danger" style="font-size:16px;padding:10px 18px" onclick="doStop()">■ 软停止（锁在当前位）</button>
+        <button class="primary" onclick="doHome()">⌂ 回初始位（待命位）</button>
+        <button onclick="doGrip('open')">夹爪张开</button>
+        <button onclick="doGrip('close')">夹爪闭合</button>
+      </div>
+      <div class="muted" id="mc-note" aria-live="polite">—</div>
+    </div>
+
+    <div class="card">
+      <h2>键盘控制 <span class="muted">先点一下这里让页面获得焦点</span></h2>
+      <p class="hint">
+        方向键在<b>水平面</b>上移动爪子，<code>W</code>/<code>S</code> 升降，<code>J</code>/<code>L</code> 调 Pitch（俯仰角）。
+        每次按下的步长由下面的「步长」决定。<b>输入框获得焦点时按键不会驱动机械臂</b>（防止打字时误动）。
+      </p>
+      <div class="mc-keys">
+        <div class="mc-krow"><kbd>W</kbd><span>上升 z+</span></div>
+        <div class="mc-krow"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd> <kbd>↓</kbd><span>水平面 x/y</span></div>
+        <div class="mc-krow"><kbd>S</kbd><span>下降 z−</span></div>
+        <div class="mc-krow"><kbd>J</kbd><kbd>L</kbd><span>Pitch −/+（更朝下 / 更平）</span></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="fld" for="mc-step">步长 <input type="number" id="mc-step" value="0.01" min="0.002" max="0.10" step="0.005" /> m</label>
+        <label class="fld" for="mc-pstep">Pitch 步长 <input type="number" id="mc-pstep" value="5" min="1" max="45" step="1" /> °</label>
+        <label class="fld" for="mc-dur">动作时长 <input type="number" id="mc-dur" value="500" min="100" max="5000" step="100" /> ms</label>
+      </div>
+      <p class="hint">时长越小动得越快。<b>500ms 适合微调，150ms 适合连按</b>；太短舵机会丢步。</p>
+    </div>
+
+    <div class="card">
+      <h2>位置控制 <span class="muted">给坐标，IK 现算</span></h2>
+      <p class="hint">
+        填工作平面坐标与俯仰角，由厂商 <code>ArmIK</code> 现算四个关节脉宽 —— 不用自己调 id3~id6。
+        坐标系与标定一致：原点 = 臂座安装面在地面的投影，单位 m；
+        <b>Pitch 区间 [-180, 0]</b>，-180 = 竖直朝下，-65 = 待命位。
+      </p>
+      <div class="row">
+        <label class="fld" for="mc-x">x <input type="number" id="mc-x" step="0.01" /></label>
+        <label class="fld" for="mc-y">y <input type="number" id="mc-y" step="0.01" /></label>
+        <label class="fld" for="mc-z">z <input type="number" id="mc-z" step="0.01" /></label>
+        <label class="fld" for="mc-pitch">pitch <input type="number" id="mc-pitch" step="5" min="-180" max="0" /></label>
+        <button class="primary" onclick="doMoveAbs()">移动</button>
+      </div>
+      <div class="muted" id="mc-target">当前目标：—</div>
+      <p class="hint">
+        ★ 这是<b>下发目标</b>，不是回读测量值 —— 舵机没有笛卡尔反馈。
+        真实姿态请看下面的舵机回读。
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>姿态预设 <span class="muted">一键切回</span></h2>
+      <p class="hint">
+        「存当前姿态」会读取 6 个舵机的<b>当前位置</b>存成预设；点预设名即可一次性切回。
+        预设存在 <code>edge/grasp/presets.json</code>（与标定文件分开，重标定不会清掉）。
+      </p>
+      <div class="row">
+        <label class="fld" for="mc-preset-name">名称 <input id="mc-preset-name" maxlength="18" placeholder="如 相机朝下" /></label>
+        <button onclick="savePreset()">存当前姿态</button>
+        <button onclick="setBootDefault()">把选中/当前设为开机默认</button>
+        <button onclick="clearBootDefault()">清除开机默认</button>
+      </div>
+      <div class="muted" id="mc-boot-note">开机默认：未设置</div>
+      <div class="mc-presets" id="mc-presets"><span class="muted">暂无预设</span></div>
+    </div>
+
+    <div class="card">
+      <h2>舵机回读 <span class="muted">真实位置</span></h2>
+      <p class="hint">
+        <b>#1 夹爪</b>（脉宽越大越闭）· <b>#2 腕部旋转</b>（500 中位）· <b>#3~#6</b> 四关节（IK 耦合，建议用上面的位置控制而不是手动点动）。
+      </p>
+      <div class="servos" id="mc-servos"><span class="muted">暂无回读</span></div>
+    </div>
+
+    <div class="card">
+      <h2>单舵机点动 <span class="muted">调试用</span></h2>
+      <p class="hint">直接下发脉宽。<b>id3~id6 是 IK 耦合关节</b>，单独设会让姿态变成非预期形状 —— 除非你知道在做什么，否则请用「位置控制」。</p>
+      <div class="row">
+        <label class="fld" for="mc-jog-id">舵机 <input type="number" id="mc-jog-id" value="1" min="1" max="6" /></label>
+        <label class="fld" for="mc-jog-pos">脉宽 <input type="number" id="mc-jog-pos" value="200" min="0" max="1000" /></label>
+        <button onclick="doJog()">下发</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="view view--stack" id="view-grasp" aria-label="抓取作业">
+    <div class="card">
+      <h2>6 · 抓取作业</h2>
+      <p class="hint">全自动闭环：检测 → 锁定（滤浮标）→ 视觉伺服逼近 → 精准夹取 → 双证据验证 → 放入旁边的料槽。平台派单后也可由桥接层自动触发同一套闭环（一次派单抓一袋，抓完即止）。</p>
+      <div class="row">
+        <button class="primary" onclick="startGrasp()">开始作业</button>
+        <button class="danger" id="grasp-stop" onclick="stopGrasp()" disabled>停止</button>
+      </div>
+      <div class="bar"><i id="grasp-bar"></i></div>
+      <div class="muted" id="grasp-note">—</div>
+      <pre class="log" id="grasp-log" data-empty="暂无日志 · 开始作业后在此实时输出"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let selectedFrame = null;
+let boxes = [];
+let imgNatural = { w: 1, h: 1 };
+let tiersLoaded = false;
+
+/**
+ * 调后端接口。
+ *
+ * ★ 这个函数踩过一个很隐蔽的坑，改之前先看完：
+ *   原来「不传 body」等于发 **GET**。结果页面上所有
+ *   `api('/api/home')` / `api('/api/gripper')` 这类**无参数的 POST 动作**
+ *   全变成了 GET —— 服务端只注册了 POST，于是回 405 "Method Not Allowed"，
+ *   按钮点了**静默没反应**（只在控制台里有一行错误）。
+ *   受害按钮：回待命位、夹爪张开、夹爪自适应闭合、保存标定、评估当前模型。
+ *
+ *   现在的口径：
+ *     - 传了 body    → POST + JSON
+ *     - 不传 body    → POST **空请求体**（无参数的动作端点都是 POST-only）
+ *     - 确实要 GET 的（只读查询）→ 显式传 'GET'：`api('/api/frames', 'GET')`
+ *
+ *   为什么不用「自动判断哪些是 GET」：那要求前端复制一份服务端的路由表，
+ *   两边一旦漂移就会以最难查的方式失效。显式传一个 'GET' 更省事也更可靠。
+ */
+async function api(url, body) {
+  let opt;
+  if (body === 'GET') {
+    opt = { method: 'GET' };
+  } else if (body === undefined) {
+    opt = { method: 'POST' };
+  } else {
+    opt = { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body) };
+  }
+  const res = await fetch(url, opt);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  return data;
+}
+function toast(text) { $('cap-note').textContent = text; }
+function errToast(err) { $('grasp-note').textContent = String(err.message || err); }
+
+/* ---------------- 状态轮询 ---------------- */
+let lastJob = '';
+async function tick() {
+  try {
+    const s = await api('/api/status', 'GET');
+    renderStatus(s);
+  } catch (e) { /* 服务重启瞬间忽略 */ }
+}
+function renderStatus(s) {
+  renderManual(s);
+  // 顶部状态胶囊
+  const det = s.detector || {};
+  const cal = s.calibration || {};
+  const task = s.task || {};
+  const plc = s.place || {};
+  $('pills').innerHTML = [
+    s.mock ? '<span class="pill warn"><b>mock</b> 无 ROS 合成模式</span>'
+      : (s.ros_error
+        ? `<span class="pill bad"><b>硬件未接入</b> ${String(s.ros_error).slice(0, 72)}</span>`
+        : '<span class="pill ok"><b>真机</b> ROS 已接入</span>'),
+    `<span class="pill ${det.ready ? 'ok' : 'bad'}"><b>检测</b> ${det.backend || '—'}${det.tuned ? ' · 已调参' : ''}</span>`,
+    `<span class="pill ${cal.ready ? 'ok' : 'warn'}"><b>标定</b> ${cal.ready ? cal.points + ' 点 RMSE ' + (cal.rmse ?? 0).toFixed(3) + 'm' : '未就绪'}</span>`,
+    `<span class="pill ${plc.ready ? 'ok' : 'bad'}"><b>放置点</b> ${plc.ready ? (plc.kind === 'coord' ? '槽位已设' : '示教位姿') : '未设置'}</span>`,
+    `<span class="pill"><b>帧</b> ${s.frames} / 已标注 ${s.labeled}</span>`,
+  ].join('');
+
+  // 放置点（料槽）：状态行 + 坐标回填（正在输入时不覆盖）
+  $('place-state').textContent = '当前：' + fmtPlace(plc);
+  if (plc.ready && plc.kind === 'coord') {
+    const ax = document.activeElement;
+    if (ax !== $('place-x') && ax !== $('place-y')) {
+      $('place-x').value = Number(plc.target[0]).toFixed(3);
+      $('place-y').value = Number(plc.target[1]).toFixed(3);
+    }
+  }
+  // 水面高度：把当前值回填进输入框（正在输入时不覆盖）
+  if (cal.plane_z != null && document.activeElement !== $('cal-plane')) {
+    $('cal-plane').value = Number(cal.plane_z).toFixed(3);
+  }
+
+  $('phase-tag').textContent = '相位 ' + (s.phase || 'idle');
+  $('dets-age').textContent = s.dets_age == null ? '—' : `检测 ${s.dets_age}s 前`;
+  const t = det.target_class || 'plastic_bag';
+  const dets = (s.detections || []);
+  $('dets-age').textContent += ` · 检出 ${dets.length}（目标 ${dets.filter(d => d.cls === t).length}）`;
+
+  // 工单上下文
+  $('task-kv').innerHTML = Object.entries(task).map(([k, v]) =>
+    `<span>${k}</span><b>${v == null ? '—' : (typeof v === 'object' ? JSON.stringify(v) : v)}</b>`).join('');
+
+  // 舵机遥测
+  $('servos').innerHTML = Object.entries(s.servos || {}).map(([id, v]) =>
+    `<div class="servo"><b>#${id}</b><code>${(v.vin / 1000).toFixed(2)}V</code>` +
+    `<code>pos ${v.position ?? '—'}</code><code>err ${v.error ?? '—'}</code></div>`).join('')
+    || '<span class="muted">暂无回读</span>';
+
+  // 训练档位（只填一次）
+  if (!tiersLoaded && s.tiers) {
+    $('train-tier').innerHTML = s.tiers.map(x => `<option value="${x}">${x}</option>`).join('');
+    tiersLoaded = true;
+  }
+
+  // 任务进度
+  const job = s.job || {};
+  // 作业没在跑时「停止」不可点：点了也只会拿到 409
+  $('grasp-stop').disabled = !(job.running && job.kind === 'grasp');
+  const sig = JSON.stringify([job.kind, job.stage, job.detail, job.result]);
+  if (sig !== lastJob) {
+    lastJob = sig;
+    renderJob(job, s);
+  }
+}
+function renderJob(job, s) {
+  if (job.kind === 'capture') {
+    const done = job.detail?.saved || 0, total = job.detail?.target_frames || 1;
+    $('cap-bar').style.width = Math.min(100, 100 * done / total) + '%';
+    // 软停止中止的采集会把 stage 置成 done（作业体正常返回）—— 只看 stage 会把
+    // 「停在 12/200 帧」读成「采完了」。以 result.cancelled 为准显式改口。
+    const stage = job.result?.cancelled ? '已软停止中止' : job.stage;
+    $('cap-note').textContent = `${stage} · ${done}/${total} 帧` + (job.error ? ' · ' + job.error : '');
+    // 新采的会话要立刻出现在两个下拉/清单里（否则刚采完还得手动刷新）
+    if (job.stage === 'done') loadSessions();
+  }
+  if (job.kind === 'train') {
+    const ep = job.detail?.epoch || 0, tot = job.detail?.total_epochs || 1;
+    $('train-bar').style.width = job.stage === 'done' ? '100%' : Math.min(100, 100 * ep / tot) + '%';
+    $('train-note').textContent = `${job.stage}${job.detail?.loss != null ? ' · loss ' + Number(job.detail.loss).toFixed(4) : ''}` +
+      `${job.detail?.map50 ? ' · mAP50 ' + Number(job.detail.map50).toFixed(4) : ''}` + (job.error ? ' · ' + job.error : '');
+    $('train-log').textContent = (job.log || []).join('\n');
+    // 免训练校准（calibrate 档）跑完，把新阈值 / ROI 拉回界面显示
+    if (job.stage === 'done' && job.result?.tier === 'calibrate') loadTuning();
+    // 训完把留出集指标摊开：混采时同时列出「泳池域（未混）」那一组 —— 否则
+    //「换域后到底行不行」会被两域合并的 val 平均掉。
+    if (job.stage === 'done' && job.result?.metrics) {
+      const m = job.result.metrics, g = job.result.gate || {};
+      let text = `留出集 mAP50 ${m.map50} P ${m.precision} R ${m.recall} · ` +
+        `门禁${g.passed ? '通过' : '未过'}`;
+      if (job.result.pool_metrics) {
+        const p = job.result.pool_metrics;
+        text += ` · 泳池域（未混）mAP50 ${p.map50} P ${p.precision} R ${p.recall}`;
+      }
+      $('train-note').textContent = text +
+        (g.passed ? '' : '（产物已落盘；是否部署由你在「4 部署与回滚」决定）');
+    }
+  }
+  if (job.kind === 'calibrate') {
+    const pts = job.detail?.step || 0;
+    $('cal-bar').style.width = Math.min(100, 100 * pts / 9) + '%';
+    $('cal-note').textContent = `${job.stage} · 第 ${pts} 点` +
+      (job.detail?.pixel ? ` 像素 ${job.detail.pixel}` : '') + (job.error ? ' · ' + job.error : '');
+  }
+  if (job.kind === 'grasp') {
+    $('grasp-bar').style.width = job.stage === 'done' ? '100%' : (job.running ? '55%' : '0%');
+    $('grasp-note').textContent = `${job.stage}` + (job.result ? ` · ${JSON.stringify(job.result)}` : '') +
+      (job.error ? ' · ' + job.error : '');
+    $('grasp-log').textContent = (job.log || []).join('\n');
+  }
+  if (job.kind === 'sweep') {
+    const ci = job.detail?.collect_index, ct = job.detail?.collect_total;
+    const idx = job.detail?.threshold_index || 0, tot = job.detail?.thresholds_total;
+    let pct = 0, label = job.stage;
+    if (job.stage === 'done') { pct = 100; label = '完成'; }
+    else if (job.stage === 'collecting' && ct) {
+      pct = 100 * ci / ct; label = `推断中 ${ci}/${ct} 张（占扫描大头）`;
+    } else if (job.stage === 'sweeping' && tot) {
+      pct = 100 * idx / tot; label = `扫阈值 第 ${idx}/${tot} 档`;
+    }
+    $('sweep-bar').style.width = pct + '%';
+    $('sweep-note').textContent = label + (job.error ? ' · ' + job.error : '');
+    $('sweep-log').textContent = (job.log || []).join('\n');
+    if (job.stage === 'done' && job.result) renderSweep(job.result);
+  }
+}
+
+/* ---------------- 水面/台面高度 ---------------- */
+async function savePlaneZ() {
+  const v = Number($('cal-plane').value);
+  if ($('cal-plane').value === '' || !Number.isFinite(v)) {
+    $('cal-note').textContent = '请先填水面高度 z（m）；船上甲板高于水面时是负数';
+    return;
+  }
+  try {
+    const r = await api('/api/calibrate/plane_z', { plane_z: v });
+    $('cal-note').textContent = `水面高度已设为 ${r.plane_z} m` +
+      (r.persisted ? '（已写入 calibration.json）' : '（未落盘：演示标定 / 标定未就绪）');
+  } catch (e) { $('cal-note').textContent = String(e.message); }
+}
+
+/* ---------------- 放置点（料槽） ---------------- */
+function fmtPlace(p) {
+  if (!p || !p.ready) return '未设置 —— 抓取闭环会拒绝开工';
+  const src = p.source === 'taught' ? '示教'
+    : (p.source === 'demo' ? '演示值（非真机示教）' : '配置文件');
+  if (p.kind === 'coord') {
+    return `${src} · 坐标 (${Number(p.target[0]).toFixed(3)}, ${Number(p.target[1]).toFixed(3)}) m`;
+  }
+  const n = Object.keys(p.target || {}).length;
+  return `${src} · 示教位姿（${n} 个舵机脉宽）`;
+}
+function placeNote(r) {
+  $('place-note').textContent = (r.persisted === false)
+    ? '已生效但未落盘（演示标定 / 标定未就绪）：重启后失效，上真机请先跑完 9 点标定'
+    : '已写入 calibration.json（与设备绑定）';
+}
+async function savePlaceCoord() {
+  const x = Number($('place-x').value), y = Number($('place-y').value);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || $('place-x').value === '' || $('place-y').value === '') {
+    $('place-note').textContent = '请先填 X / Y（m）';
+    return;
+  }
+  try { const r = await api('/api/place', { coord: [x, y] }); placeNote(r); }
+  catch (e) { $('place-note').textContent = String(e.message); }
+}
+async function teachPlacePose() {
+  try { const r = await api('/api/place', { pose: 'here' }); placeNote(r); }
+  catch (e) { $('place-note').textContent = String(e.message); }
+}
+async function clearPlace() {
+  try { const r = await api('/api/place', { clear: true }); placeNote(r); }
+  catch (e) { $('place-note').textContent = String(e.message); }
+}
+
+/* ---------------- 手动点动 ---------------- */
+async function jog() {
+  try {
+    await api('/api/jog', {
+      servo_id: Number($('jog-id').value),
+      position: Number($('jog-pos').value),
+      duration_ms: 600,
+    });
+  } catch (e) { errToast(e); }
+}
+
+/* ---------------- 采集 ---------------- */
+async function startCapture() {
+  try {
+    await api('/api/capture/start', {
+      frames: Number($('cap-frames').value),
+      tag: $('cap-tag').value,
+      augment: $('cap-augment').checked,
+    });
+    $('cap-note').textContent = '采集中…';
+    lastJob = '';
+  } catch (e) { $('cap-note').textContent = String(e.message); }
+}
+
+/* ---------------- 标注 ---------------- */
+let allFrames = [];
+let allSessions = [];
+// 上一次 /api/frames 的回执（count=磁盘总数 / returned=本次返回数）。
+// 用服务端这两个数判断「是否被截断」，而不是在前端写死 60 —— 写死的话，
+// 帧数不足 60 时也会弹「只载入最近 60 帧」，明明一帧没少。
+let framesMeta = { count: 0, returned: 0, limit: 0 };
+// 帧列表一次最多渲染这么多缩略图，其余折叠到「显示更多」。
+// 实测 300+ 帧全量铺开会把右栏拉成几千像素，把后面几张卡全推到屏幕外。
+const FRAMES_PER_PAGE = 48;
+let visibleFrames = FRAMES_PER_PAGE;
+
+function renderFrames() {
+  const keep = $('lab-session').value;
+  const list = allFrames.filter(f => !keep || f.session === keep);
+  const shown = list.slice(0, visibleFrames);
+  let html = shown.map(f => {
+    const on = selectedFrame && selectedFrame.session === f.session && selectedFrame.name === f.name;
+    return `<button data-s="${f.session}" data-n="${f.name}" class="${on ? 'sel' : ''}"` +
+      ` onclick="pickFrame(this)"><img src="${f.url}" loading="lazy" alt="${f.name}" /></button>`;
+  }).join('');
+  const rest = list.length - shown.length;
+  if (rest > 0) {
+    html += `<button class="frames__more" onclick="showMoreFrames()">显示更多` +
+      `<span>剩余 ${rest} 帧</span></button>`;
+  }
+  // 把「被服务端截断」这件事显性化：不写出来的话，操作员会以为"这个会话就只有 N 帧"
+  if (framesMeta.count > framesMeta.returned) {
+    html += `<div class="empty">共 ${framesMeta.count} 帧，只载入最近 ${framesMeta.returned} 帧` +
+      ` · 选上面某个会话可看该会话全量</div>`;
+  }
+  $('frame-list').innerHTML = html || '<div class="empty">暂无帧</div>';
+}
+function showMoreFrames() { visibleFrames += FRAMES_PER_PAGE; renderFrames(); }
+function onSessionChange() { visibleFrames = FRAMES_PER_PAGE; loadFrames(); }
+
+/* ---------------- 会话清单（一个会话 = 一个采集组） ---------------- */
+/* 会话清单必须来自 /api/sessions 而不是从帧列表反推：帧列表只回最近 60 帧，
+   早于 60 帧的会话在下拉框里根本不存在（采完的旧组没法标注、没法进训练）。 */
+async function loadSessions() {
+  try {
+    const data = await api('/api/sessions', 'GET');
+    allSessions = data.sessions || [];
+  } catch (e) {
+    $('train-sessions').innerHTML = '<div class="empty">会话列表读取失败</div>';
+    return;
+  }
+  renderSessionSelect();
+  renderSessions();
+  renderSessionState();
+}
+function renderSessionSelect() {
+  const keep = $('lab-session').value;
+  $('lab-session').innerHTML = ['<option value="">全部</option>']
+    .concat(allSessions.map(s =>
+      `<option value="${s.session}"${s.session === keep ? ' selected' : ''}>${s.session}</option>`)).join('');
+}
+function renderSessions() {
+  const box = $('train-sessions');
+  if (!allSessions.length) {
+    box.innerHTML = '<div class="empty">还没有采集会话 · 先去「1 数据采集」采一组</div>';
+    return;
+  }
+  // 保留已勾选状态：每次刷新会话清单都不该把操作员刚勾好的选择清掉
+  const checked = new Set([...box.querySelectorAll('input:checked')].map(i => i.value));
+  box.innerHTML = allSessions.map(s => {
+    const on = checked.has(s.session) ? ' checked' : '';
+    const usable = s.background ? `${s.usable}（整组背景）` : `${s.usable}`;
+    return `<label><input type="checkbox" value="${s.session}" onchange="renderSessionState()"${on} />` +
+      `<strong>${s.session}</strong><span>${s.frames} 帧 · 可用 ${usable}</span></label>`;
+  }).join('');
+}
+function selectedSessions() {
+  const box = $('train-sessions');
+  if (!box) return [];
+  return [...box.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+}
+function selectAllSessions() {
+  [...$('train-sessions').querySelectorAll('input')].forEach(i => { i.checked = true; });
+  renderSessionState();
+}
+function clearSessionSelection() {
+  [...$('train-sessions').querySelectorAll('input')].forEach(i => { i.checked = false; });
+  renderSessionState();
+}
+function recountSession(session) {
+  // 只对**选中的单个会话**重算计数：全部会话视图只载入了最近 60 帧，重算会算错。
+  // 这样每标一帧计数就跟着动，不必每次重扫全部标签文件（那要读几百个小文件）。
+  if (session) {
+    const list = allFrames.filter(f => f.session === session);
+    const labeled = list.filter(f => (f.labels || []).length > 0).length;
+    const item = allSessions.find(s => s.session === session);
+    if (item) {
+      item.frames = list.length;
+      item.labeled = labeled;
+      item.usable = item.background ? list.length : labeled;
+    }
+  }
+  renderSessionState();
+}
+function renderSessionState() {
+  // 标注台：背景标记按钮的状态（含「可用样本数」——把「采了多少帧」与
+  //「多少帧真会进训练」的差别摆到操作员眼前）
+  const sess = $('lab-session').value;
+  const item = allSessions.find(s => s.session === sess);
+  const btn = $('lab-bg-btn');
+  if (!sess || !item) {
+    btn.disabled = true;
+    btn.textContent = '标为背景负样本';
+    btn.classList.remove('danger');
+    $('lab-bg-state').textContent = '未选择会话（选一个会话后可整组标为背景）';
+  } else {
+    btn.disabled = false;
+    btn.textContent = item.background ? '取消背景标记' : '标为背景负样本';
+    btn.classList.toggle('danger', !!item.background);
+    $('lab-bg-state').textContent = item.background
+      ? `本会话 ${item.frames} 帧 · 背景负样本 · 可用 ${item.usable}（整组以空标签背景帧进训练）`
+      : `本会话 ${item.frames} 帧 · 已标注 ${item.labeled} · 可用样本 ${item.usable}（仅已标注的帧进训练）`;
+  }
+  // 训练卡：把「现场视频流必须整组切分」这个最容易忘的口径变成持续可见的提醒，
+  // 而不是靠默认值替操作员决定（默认不勾，与 CLI --group-split 一致）
+  const picked = selectedSessions();
+  const hint = $('train-split-hint');
+  if (picked.length >= 2 && !$('train-group').checked) {
+    hint.textContent = `已勾 ${picked.length} 个会话 —— 现场视频流请勾「整组切分」：` +
+      '否则同一袋的相邻帧会同时进 train 与 val，指标会虚高';
+  } else if (picked.length === 1 && $('train-group').checked) {
+    hint.textContent = '整组切分至少要 2 个会话（每个会话是一个采集单元）；只有 1 个会话时请取消勾选';
+  } else {
+    hint.textContent = picked.length ? `已勾 ${picked.length} 个会话` : '未勾选 = 使用全部会话';
+  }
+}
+async function toggleBackground() {
+  const sess = $('lab-session').value;
+  if (!sess) return;
+  const item = allSessions.find(s => s.session === sess);
+  const want = !(item && item.background);
+  try {
+    const r = await api('/api/background',
+      { session: sess, note: $('lab-bg-note').value, background: want });
+    $('lab-bg-state').textContent = (want ? '已标为背景负样本' : '已取消背景标记') +
+      ` · 可用 ${r.usable} 帧`;
+    await loadSessions();
+  } catch (e) { $('lab-bg-state').textContent = String(e.message); }
+}
+
+async function loadFrames() {
+  // 选中某个会话时**不截断**（limit=0）：否则早于最近 60 帧的会话在标注台里一帧都
+  // 看不见，等于那个会话根本没法标。全部会话时保持截断，避免把上千条塞进页面。
+  const keep = $('lab-session').value;
+  const q = keep ? `?session=${encodeURIComponent(keep)}&limit=0` : '';
+  try {
+    const data = await api('/api/frames' + q, 'GET');
+    allFrames = data.frames || [];
+    framesMeta = { count: data.count || 0, returned: data.returned || 0,
+                   limit: data.limit || 0 };
+  } catch (e) {
+    $('frame-list').innerHTML = '<div class="empty">帧列表读取失败</div>';
+    return;
+  }
+  visibleFrames = FRAMES_PER_PAGE;
+  renderFrames();
+  recountSession(keep);
+}
+function pickFrame(btn) {
+  selectedFrame = { session: btn.dataset.s, name: btn.dataset.n };
+  [...document.querySelectorAll('.frames button')].forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  const img = $('stage-img');
+  img.onload = () => { imgNatural = { w: img.naturalWidth || 1, h: img.naturalHeight || 1 }; drawBoxes(); };
+  img.src = `/api/frames/${selectedFrame.session}/${selectedFrame.name}`;
+  const found = allFrames.find(f => f.session === selectedFrame.session && f.name === selectedFrame.name);
+  boxes = (found?.labels || []).map(b => ({ ...b }));
+  $('lab-note').textContent = `${selectedFrame.name} · ${boxes.length} 个框`;
+  drawBoxes();
+}
+function drawBoxes() {
+  const stage = $('stage');
+  [...stage.querySelectorAll('.box')].forEach(el => el.remove());
+  boxes.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'box' + (b.cls === 'buoy' ? ' buoy' : '');
+    el.style.left = ((b.cx - b.w / 2) * 100) + '%';
+    el.style.top = ((b.cy - b.h / 2) * 100) + '%';
+    el.style.width = (b.w * 100) + '%';
+    el.style.height = (b.h * 100) + '%';
+    el.innerHTML = `<em>${b.cls}${b.conf ? ' ' + b.conf : ''} ×</em>`;
+    el.querySelector('em').onclick = (ev) => { ev.stopPropagation(); boxes.splice(i, 1); drawBoxes(); };
+    stage.appendChild(el);
+  });
+}
+(function bindDraw() {
+  const stage = $('stage');
+  let start = null;
+  stage.addEventListener('mousedown', (e) => {
+    if (!selectedFrame) return;
+    const r = stage.getBoundingClientRect();
+    start = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+  });
+  stage.addEventListener('mouseup', (e) => {
+    if (!start || !selectedFrame) return;
+    const r = stage.getBoundingClientRect();
+    const end = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+    const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
+    const w = Math.abs(end.x - start.x), h = Math.abs(end.y - start.y);
+    start = null;
+    if (w < 0.02 || h < 0.02) return;
+    boxes.push({ cls: $('lab-cls').value, cx: x + w / 2, cy: y + h / 2, w, h });
+    drawBoxes();
+  });
+})();
+async function prelabel() {
+  if (!selectedFrame) return;
+  try {
+    const r = await api('/api/frames/prelabel', selectedFrame);
+    boxes = r.boxes || [];
+    $('lab-note').textContent = `${selectedFrame.name} · 模型建议 ${boxes.length} 个框（未保存）`;
+    drawBoxes();
+  } catch (e) { $('lab-note').textContent = String(e.message); }
+}
+async function saveLabel() {
+  if (!selectedFrame) return;
+  try {
+    const r = await api('/api/label', { ...selectedFrame, boxes });
+    $('lab-note').textContent = `已保存 ${r.count} 个框 → ${r.path}`;
+    await loadFrames();
+  } catch (e) { $('lab-note').textContent = String(e.message); }
+}
+
+/* ---------------- 训练 / 评估 / 部署 ---------------- */
+async function startTrain() {
+  const picked = selectedSessions();
+  if ($('train-group').checked && picked.length === 1) {
+    $('train-note').textContent =
+      '整组切分至少要 2 个会话（每个会话是一个采集单元）；只有 1 个会话时请取消勾选';
+    return;
+  }
+  const mix = $('train-mix').value.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+  const spec = {
+    tier: $('train-tier').value,
+    sessions: picked,
+    group_splits: $('train-group').checked,
+    mix_dataset_yaml: mix,
+    // 门禁值与部署卡共用同一份输入（同一口径只在一处定义）
+    min_map50: Number($('dep-gate').value) || 0,
+    min_precision: Number($('dep-prec').value) || 0,
+  };
+  try {
+    await api('/api/train', spec);
+    $('train-log').textContent = '';
+    $('train-spec').textContent = '本次口径：' +
+      `${spec.tier} · 会话 ${picked.length ? picked.join(' / ') : '全部'} · ` +
+      `整组切分 ${spec.group_splits ? '开' : '关'} · ` +
+      `混采 ${mix.length ? mix.join(' / ') : '无'} · ` +
+      `门禁 mAP50≥${spec.min_map50} P≥${spec.min_precision}`;
+    lastJob = '';
+  } catch (e) { $('train-note').textContent = String(e.message); }
+}
+function showEval(r) {
+  const m = r.metrics || {};
+  const g = r.gate || {};
+  $('dep-note').textContent = `${r.ok ? '通过' : '未通过'}（${r.reason}） · ` +
+    `mAP50 ${m.map50} P ${m.precision} R ${m.recall}` +
+    `（门禁 mAP50≥${g.min_map50 ?? '—'} P≥${g.min_precision ?? '—'}；口径=ultralytics）`;
+}
+async function evalCurrent() {
+  try {
+    const r = await api('/api/evaluate', {
+      min_map50: Number($('dep-gate').value) || 0,
+      min_precision: Number($('dep-prec').value) || 0,
+    });
+    showEval(r);
+  } catch (e) { $('dep-note').textContent = String(e.message); }
+}
+async function doDeploy() {
+  try {
+    const r = await api('/api/deploy', {
+      min_map50: Number($('dep-gate').value),
+      min_precision: Number($('dep-prec').value) || 0,
+      note: '作业台部署',
+    });
+    $('dep-note').textContent = `已部署 ${r.version?.version}（${r.gate}）`;
+    loadVersions();
+  } catch (e) { $('dep-note').textContent = String(e.message); }
+}
+async function doRollback() {
+  try {
+    const r = await api('/api/rollback', { version: '' });
+    $('dep-note').textContent = `已回滚到 ${r.version?.version}`;
+    loadVersions();
+  } catch (e) { $('dep-note').textContent = String(e.message); }
+}
+async function deployFromPath() {
+  // 局域网协同那条路：笔记本上训练完，把产物路径填进来登记成新版本并切换 active
+  const p = $('dep-src').value.trim();
+  if (!p) {
+    $('dep-note').textContent = '请填训练产物的模型路径（如 runs/xxx/weights/best.onnx）';
+    return;
+  }
+  try {
+    const r = await api('/api/deploy-from', {
+      model_path: p,
+      min_map50: Number($('dep-gate').value),
+      min_precision: Number($('dep-prec').value) || 0,
+      note: '作业台登记',
+    });
+    $('dep-note').textContent = `已登记并部署 ${r.version?.version}（${r.gate}）`;
+    loadVersions();
+  } catch (e) { $('dep-note').textContent = String(e.message); }
+}
+async function loadVersions() {
+  try {
+    const r = await api('/api/versions', 'GET');
+    $('versions').innerHTML = (r.versions || []).slice().reverse().map(v =>
+      `<div class="${v.active ? 'cur' : ''}"><span>${v.version} · mAP50 ${v.metrics?.map50 ?? '—'}</span>` +
+      `<span>${v.active ? '当前' : `<button onclick="activateVersion('${v.version}')">切到此版</button>`}</span></div>`
+    ).join('') || '<div class="empty">暂无版本记录 · 部署一次后即可在此按版本回滚</div>';
+  } catch (e) { /* ignore */ }
+}
+async function activateVersion(v) {
+  try { await api('/api/rollback', { version: v }); loadVersions(); } catch (e) { $('dep-note').textContent = String(e.message); }
+}
+
+/* ---------------- 部署链路扫描（cv2.dnn） ---------------- */
+async function runSweep() {
+  try {
+    await api('/api/sweep', {
+      model_path: $('sweep-model').value.trim(),
+      split: $('sweep-split').value.trim() || 'val',
+      iou: 0.5,
+      min_precision: Number($('dep-prec').value) || 0.90,
+      min_recall: 0.80,
+    });
+    $('sweep-log').textContent = '';
+    $('sweep-note').textContent = '扫描中（每档一次全量 cv2.dnn 前向）…';
+    lastJob = '';
+  } catch (e) { $('sweep-note').textContent = String(e.message); }
+}
+async function loadSweep() {
+  try {
+    const r = await api('/api/sweep', 'GET');
+    if (r.exists && r.last) renderSweep(r.last);
+    else $('sweep-table').innerHTML =
+      '<div class="empty">暂无扫描结果 · 点上方「开始扫描」跑一次（现场真正跑的那条推理链）</div>';
+  } catch (e) { /* ignore */ }
+}
+function renderSweep(r) {
+  const rows = r.scan || [];
+  if (!rows.length) { $('sweep-table').innerHTML = '<div class="empty">扫描结果为空</div>'; return; }
+  const best = r.best_f1 || {}, cur = r.current || {};
+  $('sweep-table').innerHTML = '<table class="tbl"><thead><tr>' +
+    ['conf', 'TP', 'FP', 'FN', 'P', 'R', 'F1', '命中帧'].map(h => `<th>${h}</th>`).join('') +
+    '</tr></thead><tbody>' + rows.map(x => {
+      const cls = x.conf === best.conf ? 'best' : (x.conf === r.current_conf ? 'cur' : '');
+      return `<tr class="${cls}"><td>${Number(x.conf).toFixed(2)}</td><td>${x.tp}</td>` +
+        `<td>${x.fp}</td><td>${x.fn}</td><td>${x.precision.toFixed(3)}</td>` +
+        `<td>${x.recall.toFixed(3)}</td><td>${x.f1.toFixed(3)}</td>` +
+        `<td>${x.hit_frames}/${r.images}</td></tr>`;
+    }).join('') + '</tbody></table>';
+  $('sweep-note').textContent =
+    `backend=${r.backend} · ${r.split} 集 ${r.images} 张 · ${r.target_class} 真值 ${r.gt_target} 框 · ` +
+    `F1 最优 conf=${Number(best.conf).toFixed(2)} P=${best.precision} R=${best.recall}` +
+    `（误检：其他类 ${best.fp_other} / 纯背景 ${best.fp_background}） · ` +
+    `当前 conf=${r.current_conf} P=${cur.precision} R=${cur.recall} → ${r.verdict}`;
+}
+
+/* ---------------- 场景特化（免训练校准 + 手动调参） ---------------- */
+function _num(id) {
+  const v = $(id).value.trim();
+  return v === '' ? null : Number(v);
+}
+async function sceneCalibrate() {
+  try {
+    await api('/api/train', { tier: 'calibrate' });
+    $('tuning-note').textContent = '场景校准中（秒级：扫阈值 + 推 ROI）…';
+    lastJob = '';
+  } catch (e) { $('tuning-note').textContent = String(e.message); }
+}
+async function loadTuning() {
+  try {
+    const t = await api('/api/tuning', 'GET');
+    $('tune-conf').value = t.conf_threshold;
+    $('tune-iou').value = t.iou_threshold;
+    const roi = t.roi || ['', '', '', ''];
+    ['x', 'y', 'w', 'h'].forEach((k, i) => { $('tune-' + k).value = roi[i]; });
+    $('tuning-note').textContent =
+      (t.exists ? '已加载 tuning.json' : '暂无 tuning.json（用配置默认值）') +
+      ` · conf ${t.conf_threshold} · IoU ${t.iou_threshold}` +
+      (t.roi ? ` · ROI ${t.roi.map(v => Number(v).toFixed(2)).join(', ')}` : ' · 无 ROI（全画面）');
+    $('tune-sweep').textContent = (t.sweep || []).length
+      ? '上次扫描：' + t.sweep.map(r => `conf ${r.conf} → F1 ${r.f1}`).join('  |  ')
+      : '—';
+  } catch (e) { $('tuning-note').textContent = String(e.message); }
+}
+async function saveTuning() {
+  const body = { conf_threshold: _num('tune-conf'), iou_threshold: _num('tune-iou') };
+  const roi = ['x', 'y', 'w', 'h'].map(k => _num('tune-' + k));
+  const filled = roi.filter(v => v !== null).length;
+  if (filled === 4) body.roi = roi;
+  else if (filled > 0) {
+    $('tuning-note').textContent = 'ROI 要么 4 个值全填（x y w h），要么全部留空';
+    return;
+  }
+  try {
+    const r = await api('/api/tuning', body);
+    $('tuning-note').textContent =
+      `已保存并立即生效 · conf ${r.conf_threshold} · IoU ${r.iou_threshold}` +
+      (r.roi ? ` · ROI ${r.roi.join(', ')}` : ' · 无 ROI');
+  } catch (e) { $('tuning-note').textContent = String(e.message); }
+}
+async function clearTuningRoi() {
+  try {
+    await api('/api/tuning', { clear_roi: true });
+    $('tuning-note').textContent = '已取消 ROI（全画面都参与候选）';
+    await loadTuning();
+  } catch (e) { $('tuning-note').textContent = String(e.message); }
+}
+
+/* ---------------- 标定 / 抓取 ---------------- */
+async function startCalibrate() {
+  try {
+    await api('/api/calibrate/start', { grid_size: Number($('cal-n').value), span: Number($('cal-span').value) });
+    $('cal-note').textContent = '标定中，请按提示放置目标…';
+    lastJob = '';
+  } catch (e) { $('cal-note').textContent = String(e.message); }
+}
+async function startGrasp() {
+  try {
+    await api('/api/grasp/start', { task_id: '' });
+    $('grasp-log').textContent = '';
+    lastJob = '';
+  } catch (e) { errToast(e); }
+}
+async function stopGrasp() {
+  try {
+    await api('/api/grasp/stop');
+    lastJob = '';
+  } catch (e) { errToast(e); }
+}
+
+/* ---- 骨架关节 id3~id6 ---- */
+// 每个关节的行程都是**在这台机器上实测**出来的，然后取「舵机跟得准」的内段：
+//   id3 实测 151~627（全程误差 ≤5）      → 界面放开 170~620
+//   id4 实测 514~1001（顶到量程上限 1000）→ 界面放开 520~980（留余量，别压量程）
+//   id5 实测 344~808（靠下限误差涨到 13） → 界面放开 370~790
+//   id6 实测 275~733（靠下限误差涨到 16） → 界面放开 300~720
+// ★ 为什么不干脆放开 0~1000：这些是耦合关节，走到跟不上的区间时
+//   舵机会"不到位但也不报错"，末端位置就与预期不符 —— 抓取会瞄错地方。
+//   宁可拒绝，也不要给出一个看起来有效、实际失真的行程。
+const JOINTS = [
+  { id: 3, key: 'J3', min: 170, max: 620, label: '升降大臂',
+    meas: '实测 151~627' },
+  { id: 4, key: 'J4', min: 520, max: 980, label: '肘/前臂',
+    meas: '实测 514~1001（顶量程）' },
+  { id: 5, key: 'J5', min: 370, max: 790, label: '腕部俯仰',
+    meas: '实测 344~808' },
+  { id: 6, key: 'J6', min: 300, max: 720, label: '末端旋转',
+    meas: '实测 275~733' },
+];
+let activeJoint = JOINTS[0];          // 默认就是「第三个关节」J3
+let jointBusy = false;
+
+function renderJointTabs() {
+  const el = $('mc-jtabs');
+  if (!el) return;
+  el.innerHTML = JOINTS.map(j =>
+    `<button class="mc-jtab ${j === activeJoint ? 'is-active' : ''}" ` +
+    `onclick="selectJoint(${j.id})">${j.key} · id${j.id}<small>${j.label}</small></button>`
+  ).join('');
+}
+
+function selectJoint(id) {
+  const j = JOINTS.find(x => x.id === id);
+  if (!j) return;
+  activeJoint = j;
+  renderJointTabs();
+  const r = $('mc-joint-range');
+  r.min = j.min; r.max = j.max;
+  $('mc-joint-label').textContent = `${j.key} · id${j.id}（${j.label}）`;
+  $('mc-joint-sub').textContent = `${j.meas} · 界面行程 ${j.min}~${j.max}`;
+  // 立刻用服务器回读值刷新显示
+  tick();
+  jointNote(`${j.key}（id${j.id}）已选中，行程 ${j.min}~${j.max}`);
+}
+
+function jointStep(dir) {
+  const step = Math.max(1, Math.min(200, Number($('mc-joint-step').value) || 20));
+  const cur = Number($('mc-joint-val').textContent);
+  const base = Number.isFinite(cur) ? cur : Math.round((activeJoint.min + activeJoint.max) / 2);
+  jointSet(base + dir * step);
+}
+
+async function jointSet(pulse) {
+  const j = activeJoint;
+  const p = Math.max(j.min, Math.min(j.max, Math.round(Number(pulse))));
+  if (jointBusy) return;               // 连点保护：总线串行，别灌队列
+  jointBusy = true;
+  try {
+    await api('/api/joint', { joint: j.key, position: p, duration_ms: 600 });
+    $('mc-joint-val').textContent = String(p);
+    $('mc-joint-range').value = String(p);
+    jointNote(`${j.key}（id${j.id}）→ ${p}`);
+  } catch (e) {
+    jointNote(`${j.key} 动作失败：` + String(e.message || e), true);
+  } finally {
+    setTimeout(() => { jointBusy = false; }, 450);
+  }
+}
+
+// 拖动只显示、松手才下发（同腕部控件：拖一次灌几十条会把队列堵住）
+function jointSlider(value, commit) {
+  const p = Math.round(Number(value));
+  $('mc-joint-val').textContent = String(p);
+  if (commit) jointSet(p);
+}
+
+function jointCenter() {
+  jointSet(Math.round((activeJoint.min + activeJoint.max) / 2));
+}
+
+function jointNote(text, isErr) {
+  const el = $('mc-joint-note');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isErr ? 'var(--c-danger)' : '';
+}
+
+/* ---- 最前端关节：腕部旋转（id2）---- */
+// 末端链是 id2 腕转 → id1 夹爪，所以「臂最前面那个关节」就是 id2。
+// 行程取实测安全区 300~700：我在这块真机上小步走过 380~680 全程，
+// 实测跟随误差 ±2，超出这段没验证过，所以界面不放开，避免甩到台面。
+const WRIST_MIN = 300, WRIST_MAX = 700, WRIST_CENTER = 500;
+let wristBusy = false;
+
+function wristStep(dir) {
+  const step = Math.max(1, Math.min(200, Number($('mc-front-step').value) || 20));
+  const cur = Number($('mc-front-val').textContent);
+  const base = Number.isFinite(cur) ? cur : WRIST_CENTER;
+  wristSet(base + dir * step);
+}
+
+async function wristSet(pulse) {
+  const p = Math.max(WRIST_MIN, Math.min(WRIST_MAX, Math.round(Number(pulse))));
+  if (wristBusy) return;                 // 连点保护：舵机是串行总线，别灌队列
+  wristBusy = true;
+  try {
+    await api('/api/wrist', { position: p, duration_ms: 600 });
+    $('mc-front-val').textContent = String(p);
+    $('mc-front-range').value = String(p);
+    wristNote(`腕部 → ${p}${p === WRIST_CENTER ? '（中位）' : ''}`);
+  } catch (e) {
+    wristNote('腕部动作失败：' + String(e.message || e), true);
+  } finally {
+    // 给舵机一点时间走完再允许下一次，避免连点把目标刷得比机械臂还快
+    setTimeout(() => { wristBusy = false; }, 450);
+  }
+}
+
+// 拖动时实时显示数值但**不下发**（oninput），松手才真发一条（onchange）。
+// 否则拖一次会灌进几十条指令，总线队列堵住后表现成「拖完过一会儿才动」。
+function wristSlider(value, commit) {
+  const p = Math.round(Number(value));
+  $('mc-front-val').textContent = String(p);
+  if (commit) wristSet(p);
+}
+
+function wristNote(text, isErr) {
+  const el = $('mc-front-note');
+  el.textContent = text;
+  el.style.color = isErr ? 'var(--c-danger)' : '';
+}
+
+async function saveFrontPreset() {
+  const cur = Number($('mc-front-val').textContent);
+  const name = `腕转${Number.isFinite(cur) ? cur : WRIST_CENTER}`;
+  try {
+    const r = await api('/api/presets', { name });
+    renderPresets(r);
+    wristNote(`已存预设「${r.name}」（整个姿态，不只是腕部）`);
+  } catch (e) {
+    wristNote('存预设失败：' + String(e.message || e), true);
+  }
+}
+
+/* ---------------- 手动控制（位置 / 键盘 / 预设 / 软停止） ---------------- */
+
+// 本地维护的「当前目标」。这里**不能**每帧从 status.manual_target 无条件覆盖：
+// 否则快速连按时，前一次请求还没返回、界面就被回读值倒推回去，
+// 出现「按了 3 下只动了 1 下」。所以以本地为准，只在差异明显时才采纳服务端值。
+let mcTarget = null;
+
+function mcNum(id) { const v = Number($(id).value); return Number.isFinite(v) ? v : null; }
+function mcNote(text, isErr) {
+  const el = $('mc-note');
+  el.textContent = text;
+  el.style.color = isErr ? 'var(--c-danger)' : '';
+}
+function mcDur() { return Math.max(100, Math.min(5000, Number($('mc-dur').value) || 500)); }
+function mcStep() { return Math.abs(Number($('mc-step').value) || 0.01); }
+function mcPStep() { return Math.abs(Number($('mc-pstep').value) || 5); }
+
+function mcFillTarget(t, known) {
+  // known=false 时输入框留空并提示，避免把旧值当有效基准显示
+  const set = (id, v) => { if (v == null) { $(id).value = ''; return; }
+    if (document.activeElement !== $(id)) $(id).value = Number(v).toFixed(3); };
+  set('mc-x', t ? t.x : null); set('mc-y', t ? t.y : null);
+  set('mc-z', t ? t.z : null);
+  if (t && document.activeElement !== $('mc-pitch')) {
+    $('mc-pitch').value = Number(t.pitch).toFixed(0);
+  } else if (!t) { $('mc-pitch').value = ''; }
+  const el = $('mc-target');
+  if (!t) {
+    el.className = 'muted mc-target-off';
+    el.textContent = '当前目标：基准已失效（做过软停止或切过预设）—— 请填完整 x / y / z 后再用键盘';
+  } else {
+    el.className = 'muted';
+    el.innerHTML = `当前目标：x=${t.x.toFixed(3)} y=${t.y.toFixed(3)} z=${t.z.toFixed(3)} ` +
+      `pitch=${Number(t.pitch).toFixed(0)}° <span class="muted">（下发目标，非回读）</span>`;
+  }
+}
+
+async function mcMove(delta, durOverride) {
+  const body = Object.assign({ duration_ms: durOverride || mcDur() }, delta);
+  try {
+    const r = await api('/api/move_to', body);
+    if (r.reachable) {
+      mcTarget = r.target;
+      mcFillTarget(mcTarget, true);
+      mcNote('已移动到目标');
+    } else {
+      // 不可达：服务端不更新记录位姿，本地也保持原样，界面上如实说明
+      mcTarget = r.target;
+      mcFillTarget(mcTarget, true);
+      mcNote('目标不可达，已停在原位（IK 无解）', true);
+    }
+    return r;
+  } catch (e) {
+    mcNote('移动失败：' + String(e.message || e), true);
+    return null;
+  }
+}
+
+function doMoveAbs() {
+  const x = mcNum('mc-x'), y = mcNum('mc-y'), z = mcNum('mc-z'), p = mcNum('mc-pitch');
+  if (x === null || y === null || z === null || p === null) {
+    mcNote('请填完整的 x / y / z / pitch（pitch 区间 -180 ~ 0）', true);
+    return;
+  }
+  mcMove({ x, y, z, pitch: p, strict: true });
+}
+
+function keyboardStep(action) {
+  if (!mcTarget) {
+    mcNote('基准已失效 —— 请先填完整坐标并用「移动」一次，键盘控制才有起点', true);
+    return;
+  }
+  const s = mcStep(), ps = mcPStep();
+  if (action === 'left')  mcMove({ dx: -s });
+  else if (action === 'right') mcMove({ dx: s });
+  else if (action === 'up')    mcMove({ dy: s });
+  else if (action === 'down')  mcMove({ dy: -s });
+  else if (action === 'rise')  mcMove({ dz: s });
+  else if (action === 'fall')  mcMove({ dz: -s });
+  else if (action === 'pitchDown') mcMove({ dpitch: -ps });   // 往 -180 方向 = 更朝下
+  else if (action === 'pitchUp')   mcMove({ dpitch: ps });    // 往 0 方向 = 更平
+}
+
+async function doStop() {
+  try {
+    const r = await api('/api/stop');
+    mcTarget = null;
+    mcFillTarget(null, false);
+    mcNote(`软停止完成（中止作业：${r.stopped_job ? '是' : '否'}）。` +
+           `舵机已锁在当前位置，但**仍然带电**。要恢复键盘控制请重新填坐标。`);
+  } catch (e) { mcNote('软停止失败：' + String(e.message || e), true); }
+}
+
+async function doHome() {
+  try {
+    await api('/api/home');
+    // 待命位是已知的，用它恢复基准
+    mcTarget = { x: 0.0, y: 0.17, z: 0.30, pitch: -65 };
+    mcFillTarget(mcTarget, true);
+    mcTarget = null;   // 保守：home 用的是 config 里的值，让它下次以服务端为准
+    mcNote('已回待命位');
+    const s = await api('/api/status', 'GET');
+    if (s.manual_target) { mcTarget = s.manual_target; mcFillTarget(mcTarget, true); }
+  } catch (e) { mcNote('回位失败：' + String(e.message || e), true); }
+}
+
+async function doGrip(action) {
+  try {
+    const r = await api('/api/gripper', { action });
+    mcNote(action === 'open' ? '夹爪已张开'
+      : `夹爪闭合（脉宽 ${r.pulse}${r.pulse != null && r.pulse < 450 ? '，遇阻即停' : ''}）`);
+  } catch (e) { mcNote('夹爪失败：' + String(e.message || e), true); }
+}
+
+async function doJog() {
+  const sid = Number($('mc-jog-id').value), pos = Number($('mc-jog-pos').value);
+  try {
+    await api('/api/jog', { servo_id: sid, position: pos, duration_ms: mcDur() });
+    mcNote(`舵机 #${sid} → ${pos}`);
+  } catch (e) { mcNote('点动失败：' + String(e.message || e), true); }
+}
+
+/* ---- 预设 ---- */
+let activePresetName = '';      // 最近一次点击/应用的预设，供「设为开机默认」用
+
+function renderPresets(p) {
+  const items = (p && p.items) || [];
+  const boot = (p && p.boot_default) || '';
+  const el = $('mc-presets');
+  const note = $('mc-boot-note');
+  if (note) {
+    note.innerHTML = boot
+      ? `开机默认：<b>${boot}</b> —— 板子每次开机都会自动摆到这个姿态`
+      : '开机默认：未设置（板子开机不会自动摆位）';
+  }
+  if (!items.length) { el.innerHTML = '<span class="muted">暂无预设</span>'; return; }
+  const esc = (s) => String(s).replace(/'/g, "\\'");
+  el.innerHTML = items.map(it => {
+    const isBoot = it.name === boot;
+    return `<span class="mc-preset">` +
+      `<button class="${isBoot ? 'is-boot' : ''}" title="${isBoot ? '开机默认' : '切到此姿态'}" ` +
+      `onclick="applyPreset('${esc(it.name)}')">${isBoot ? '★ ' : ''}${it.name}</button>` +
+      `<button class="mc-boot" title="设为开机默认" onclick="setBootDefault('${esc(it.name)}')">⚑</button>` +
+      `<button class="mc-del" title="删除" onclick="delPreset('${esc(it.name)}')">×</button>` +
+      `</span>`;
+  }).join('');
+}
+
+async function setBootDefault(name) {
+  const target = name || activePresetName || ($('mc-preset-name').value || '').trim();
+  if (!target) {
+    mcNote('请先在预设名称里填一个名字并「存当前姿态」，或点某个预设的 ⚑ 按钮', true);
+    return;
+  }
+  try {
+    const r = await api('/api/presets/boot', { name: target });
+    renderPresets(r);
+    const exp = r.export || {};
+    mcNote(exp.ok
+      ? `已把「${r.boot_default}」设为开机默认。还需在开发机跑一次同步命令推到板子：` +
+        `python scripts/sync_boot_pose.py --host <板子IP> --apply`
+      : `已设为开机默认，但导出 boot_pose.json 失败：${exp.error || '未知'}`, !exp.ok);
+  } catch (e) { mcNote('设置开机默认失败：' + String(e.message || e), true); }
+}
+
+async function clearBootDefault() {
+  try {
+    const r = await api('/api/presets/boot', { name: '' });
+    renderPresets(r);
+    mcNote('已清除开机默认（板子开机不再自动摆位）');
+  } catch (e) { mcNote('清除失败：' + String(e.message || e), true); }
+}
+
+async function savePreset() {
+  const name = ($('mc-preset-name').value || '').trim();
+  if (!name) { mcNote('请先填预设名称', true); return; }
+  try {
+    const r = await api('/api/presets', { name });   // 不传 pose = 用当前回读值
+    activePresetName = r.name;
+    renderPresets(r);
+    mcNote(`已存预设「${r.name}」${r.overwritten ? '（覆盖了同名）' : ''}：` +
+           Object.entries(r.pose).map(([k, v]) => `#${k}=${v}`).join(' '));
+  } catch (e) { mcNote('存预设失败：' + String(e.message || e), true); }
+}
+
+async function applyPreset(name) {
+  activePresetName = name;
+  try {
+    await api('/api/presets/apply', { name });
+    mcTarget = null;                       // 脉宽无法反推笛卡尔坐标
+    mcFillTarget(null, false);
+    mcNote(`已切到预设「${name}」。注意：这是舵机脉宽预设，笛卡尔基准已失效`);
+    const s = await api('/api/status', 'GET');
+    renderPresets(s.presets);
+  } catch (e) { mcNote('切预设失败：' + String(e.message || e), true); }
+}
+
+async function delPreset(name) {
+  try {
+    const r = await api('/api/presets', { name, delete: true });
+    renderPresets(r);
+    mcNote(`已删除预设「${name}」`);
+  } catch (e) { mcNote('删除失败：' + String(e.message || e), true); }
+}
+
+/* ---- 键盘 ---- */
+const MC_KEYS = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+  w: 'rise', W: 'rise', s: 'fall', S: 'fall',
+  'j': 'pitchDown', 'J': 'pitchDown',
+  'l': 'pitchUp', 'L': 'pitchUp',
+};
+// 连按节流：400ms 内只发一条。舵机是总线串行设备，灌太多指令会堵队列，
+// 表现成「按了半天没动，松手后突然连着动好几下」。
+let mcLastKeyTs = 0;
+document.addEventListener('keydown', (ev) => {
+  const view = $('view-manual');
+  if (!view || !view.classList.contains('is-active')) return;
+  // ★ 输入框聚焦时不劫持按键：否则在 x/y/z 里按方向键会被吞掉、还顺手驱动机械臂
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+  const action = MC_KEYS[ev.key];
+  if (!action) return;
+  ev.preventDefault();
+  const now = Date.now();
+  if (now - mcLastKeyTs < 400) return;
+  mcLastKeyTs = now;
+  keyboardStep(action);
+});
+
+/* ---------------- 手动控制：状态同步 ---------------- */
+let mcPrevTargetJson = '';
+function renderManual(s) {
+  // 舵机回读（独立于「标定与点动」页那一份，两边都渲染）
+  const el = $('mc-servos');
+  if (el) {
+    el.innerHTML = Object.entries(s.servos || {}).map(([id, v]) =>
+      `<div class="servo"><b>#${id}</b><code>${(v.vin / 1000).toFixed(2)}V</code>` +
+      `<code>pos ${v.position ?? '—'}</code><code>err ${v.error ?? '—'}</code></div>`
+    ).join('') || '<span class="muted">暂无回读</span>';
+  }
+  // 骨架关节：把当前选中关节的回读同步到大字显示（操作中不覆盖，同腕部口径）
+  const jid = String(activeJoint.id);
+  const jv = (s.servos || {})[jid];
+  if (jv && jv.position != null && !jointBusy
+      && document.activeElement !== $('mc-joint-range')) {
+    const p = Number(jv.position);
+    $('mc-joint-val').textContent = String(p);
+    $('mc-joint-range').value = String(p);
+    const inRange = p >= activeJoint.min && p <= activeJoint.max;
+    $('mc-joint-sub').textContent = `${activeJoint.meas} · 界面行程 ${activeJoint.min}~${activeJoint.max}`
+      + (inRange ? '' : '  ⚠ 当前在界面行程之外');
+  }
+  // 预设
+  if ($('mc-presets')) renderPresets(s.presets);
+  // 最前端关节（腕转 id2）的大字回显：只有不在操作中时才被回读值覆盖，
+  // 否则连点时旧回读会把刚下发的数字顶回去，看起来像"没按动"。
+  const wv = (s.servos || {})['2'];
+  if (wv && wv.position != null && !wristBusy && document.activeElement !== $('mc-front-range')) {
+    const pos = Number(wv.position);
+    $('mc-front-val').textContent = String(pos);
+    $('mc-front-range').value = String(pos);
+    $('mc-front-sub').textContent = pos === WRIST_CENTER
+      ? '中位 500' : (pos > WRIST_CENTER ? `偏顺时针（中位 500 ${pos - WRIST_CENTER >= 0 ? '+' : ''}${pos - WRIST_CENTER}）`
+                                         : `偏逆时针（中位 500 ${pos - WRIST_CENTER}）`);
+  }
+  // 目标：只在服务端值**真的变了**时才覆盖本地（见 mcTarget 的注释）
+  const st = s.manual_target;
+  const json = JSON.stringify(st || null);
+  if (json !== mcPrevTargetJson) {
+    mcPrevTargetJson = json;
+    mcTarget = st || null;
+    if ($('mc-target')) mcFillTarget(mcTarget, !!st);
+  }
+}
+
+/* ---------------- 分区切换（按钮跳转，页面不再拉长） ---------------- */
+const VIEWS = ['live', 'collect', 'label', 'train', 'deploy', 'calib', 'manual', 'grasp'];
+function showView(name) {
+  if (!VIEWS.includes(name)) name = VIEWS[0];
+  VIEWS.forEach(v => {
+    const el = $('view-' + v);
+    if (el) el.classList.toggle('is-active', v === name);
+  });
+  [...document.querySelectorAll('.tab')].forEach(b =>
+    b.classList.toggle('is-active', b.dataset.view === name));
+  // 把当前分区写进 hash：刷新/换设备后还停在同一页，也方便演示直接跳 #grasp
+  if (location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
+}
+window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+
+/* ---------------- 启动 ---------------- */
+showView(location.hash.slice(1));
+selectJoint(3);          // 默认选中「第三个关节」J3，并渲染四个关节的切换标签
+setInterval(tick, 1000);
+tick();
+loadSessions();
+loadFrames();
+loadVersions();
+loadTuning();
+loadSweep();
+</script>
+</body>
+</html>

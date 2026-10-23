@@ -1,0 +1,113 @@
+﻿# EMQX 认证与授权启动数据（一次性导入）
+#
+# ★ 重要：这不是"配置文件"，是 EMQX 5.x 的**数据导入格式**。
+#   挂到 /opt/emqx/data/bootstrap.csv 后，EMQX 首次启动会把它写进内置数据库
+#   （mnesia）。之后**改这个文件不会生效** —— 因为:
+#     1) bootstrap 只在 dashboard 里"没有任何数据"时才导入
+#     2) 也就是说，改了它必须同时清掉 emqx_data 卷
+#
+#   改凭据的正确姿势（二选一）：
+#     A. 开发环境：docker compose down -v && docker compose up -d
+#     B. 生产环境：进 Dashboard（18083）在线改，别动这个文件
+#
+#   ⚠️ 千万不要试图"改文件 + restart"来改密码 —— 不会生效，
+#      然后你会花两小时排查"为什么密码没变"。
+#
+# 表结构（三类，靠第一列区分）：
+#   mqtt_user      用户表      user_id(用户名) / password_hash / salt / is_superuser
+#   mqtt_acl       权限表      username / permission / action / topic
+#   mqtt_clientid  客户端绑定  仅用于"一个账号只允许一个连接"的强绑场景
+#
+# 密码哈希：EMQX 默认用 sha256 + salt。下面这些 hash 是
+#   plain "CHANGE_ME" → sha256 后的值，**仅用于本地开发**。
+#   生产部署必须重新生成（见文末命令），否则等于没有密码。
+
+mqtt_user,user_id,password_hash,salt,is_superuser
+mqtt_user,seasight,442cbf3fdf0f24777036e660c32d6e4b5f7621231bff2754673c5a188a2f614a,,false
+
+mqtt_user,backend_service,442cbf3fdf0f24777036e660c32d6e4b5f7621231bff2754673c5a188a2f614a,,false
+
+mqtt_user,edge_device,442cbf3fdf0f24777036e660c32d6e4b5f7621231bff2754673c5a188a2f614a,,false
+
+mqtt_user,dashboard_viewer,442cbf3fdf0f24777036e660c32d6e4b5f7621231bff2754673c5a188a2f614a,,false
+
+mqtt_user,robot_device,442cbf3fdf0f24777036e660c32d6e4b5f7621231bff2754673c5a188a2f614a,,false
+
+# ----------------------------------------------------------------------
+# ACL —— 最小权限原则
+#
+# ★ 三条铁律（对应 docs/mqtt-topics.md 的第 3 节）：
+#   1. 设备只能**发布**自己的上行主题，不能订阅别人的（防伪造）
+#   2. 后端可以订阅全部上行主题，只能发布下行（任务/指令）
+#   3. **前端绝不直连 MQTT** —— 走 HTTP/WS 由后端转发。
+#      所以 dashboard_viewer 只给读遥测的权限，给完也是摆设，
+#      真正要防的是"有人图省事让前端连 1883"。
+#
+# 字段：username / permission(allow|deny) / action(publish|subscribe|all) / topic
+#
+# 通配符：+ 匹配单层，$share 前缀是共享订阅
+# ----------------------------------------------------------------------
+
+# ---------- 后端服务：收全部上行、发全部下行 ----------
+mqtt_acl,backend_service,allow,subscribe,marine/+/+/event
+mqtt_acl,backend_service,allow,subscribe,marine/+/+/telemetry
+mqtt_acl,backend_service,allow,subscribe,marine/+/+/status
+mqtt_acl,backend_service,allow,subscribe,robot/+/cmd/ack
+mqtt_acl,backend_service,allow,subscribe,robot/+/task/progress
+mqtt_acl,backend_service,allow,publish,robot/+/task
+mqtt_acl,backend_service,allow,publish,robot/+/cmd
+# 后端自己也发遥测（健康自报），但只允许发自己的设备号段
+mqtt_acl,backend_service,allow,publish,marine/+/backend-+/status
+
+# ---------- 边缘设备：只能发自己的、收自己的 ----------
+# 注意这里用 %c（clientid）做变量绑定是不行的 —— EMQX 的 topic 占位符
+# 是 %u（username）/%c（clientid），写法见官方文档。
+# 原型期先按前缀放开，二期换成「每台设备一个账号 + %u 绑定」。
+mqtt_acl,edge_device,allow,publish,marine/+/+/event
+mqtt_acl,edge_device,allow,publish,marine/+/+/telemetry
+mqtt_acl,edge_device,allow,publish,marine/+/+/status
+mqtt_acl,edge_device,allow,subscribe,robot/+/task
+mqtt_acl,edge_device,allow,subscribe,robot/+/cmd
+
+# ---------- 机器人：收任务、发进度 ----------
+# 原型期先共用 robot_device 账号；真机接入生产环境前应改成每台设备独立账号，
+# 用 %u（username）或精确 robot/{id}/... 主题收紧，便于单台吊销。
+# 真机遥测目前必须走 marine/{site}/{robot_id}/telemetry ——
+# 后端只订阅 marine/+/+/telemetry，不消费 robot/+/telemetry。
+mqtt_acl,robot_device,allow,subscribe,robot/+/task
+mqtt_acl,robot_device,allow,subscribe,robot/+/cmd
+mqtt_acl,robot_device,allow,publish,robot/+/cmd/ack
+mqtt_acl,robot_device,allow,publish,robot/+/task/progress
+mqtt_acl,robot_device,allow,publish,marine/+/+/telemetry
+mqtt_acl,robot_device,allow,publish,marine/+/+/status
+
+# ---------- 只读观察者 ----------
+mqtt_acl,dashboard_viewer,allow,subscribe,marine/+/+/status
+mqtt_acl,dashboard_viewer,allow,subscribe,marine/+/+/telemetry
+mqtt_acl,dashboard_viewer,allow,subscribe,robot/+/task/progress
+
+# ---------- 兜底拒绝（显式写出来，避免"忘了配就等于放开"） ----------
+# EMQX 默认策略是 deny，但显式写出来能防止有人把全局策略改成 allow 后
+# 权限悄悄放大。
+mqtt_acl,edge_device,deny,all,#
+mqtt_acl,dashboard_viewer,deny,all,#
+mqtt_acl,robot_device,deny,all,#
+
+# ----------------------------------------------------------------------
+# 如何生成正确的密码哈希
+#
+# EMQX 5.x 用 sha256(password + salt)，salt 为空时就是纯 sha256。
+# 生成命令（容器内）：
+#
+#   docker compose exec emqx /opt/emqx/bin/emqx ctl admins passwd
+#   # 或纯手算（无 salt 时）：
+#   echo -n 'CHANGE_ME' | sha256sum
+#
+# 更推荐：直接用 Dashboard 建账号（18083 → Access Control → Authentication
+# → Built-in Database → Users → Add），改完 export 一下配置即可。
+#
+# ⚠️ 本文件里的 hash 是开发占位值。上线前必须：
+#   1. 重新生成强密码哈希替换这里
+#   2. 把真实密码写进 .env（不进仓库）
+#   3. 确认 .env 在 .gitignore 里
+# ----------------------------------------------------------------------

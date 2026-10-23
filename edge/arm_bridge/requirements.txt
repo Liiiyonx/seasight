@@ -1,0 +1,7 @@
+paho-mqtt>=2.0
+PyYAML>=6.0
+
+# Hiwonder bus-servo arms use the vendor-provided ros_robot_controller_sdk.py
+# (not published on PyPI). Copy it next to this package on the Pi and install
+# pyserial there; the driver imports it lazily so tests here do not need it.
+# pyserial>=3.5

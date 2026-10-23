@@ -1,0 +1,43 @@
+# ============================================================
+# 示例：训练集清单（manifest_type: train）
+# 当前仅演示结构 —— 未采集任何图片，status: planned，E0。
+# ============================================================
+schema_version: "1.0"
+manifest_type: train
+name: train_20260918_lianjiang_example
+description: "训练集示例：连江养殖区白天平潮合成帧（结构演示，无真实图片）"
+
+status: planned
+
+isolation:
+  method: logical
+  physical_note: "与 test/blind 物理分离：独立目录树 ml/datasets/seasight/images/train"
+  logical_rule: "同一采集批次按时间窗切分：第 1~20 天归 train，第 21~25 天归 val；任何点位/日期不得与 test、blind 重叠"
+
+data_type: synthetic
+evidence_level: E0
+
+location:
+  images: ../seasight/images/train
+  labels: ../seasight/labels/train
+  video: null
+
+annotation:
+  format: yolo_txt
+  iou_threshold: 0.5
+
+created: "2026-09-18"
+owner: "感知负责人"
+source:
+  device: "CAM-MABI-01"
+  region: "连江马鼻码头"
+  date_range: ["2026-09-01", "2026-09-20"]
+  license: "合成帧，无授权约束（自研）"
+
+sample_count: 0
+
+confounders:
+  - lighting
+  - background
+  - target_size
+  - weather
